@@ -1,13 +1,14 @@
 const hre = require("hardhat");
 
 async function main() {
-  const TradeSimulator = await hre.ethers.getContractFactory("TradeSimulator");
-  const contract = await TradeSimulator.deploy();
+    const NFT = await hre.ethers.getContractFactory("UserAchievementNFT");
+    const nft = await NFT.deploy();
+    await nft.waitForDeployment();
 
-  console.log(`✅ Contract deployed at: ${contract.target}`);
+    console.log(` NFT Contract deployed at: ${await nft.getAddress()}`);
 }
 
 main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
+    console.error(error);
+    process.exitCode = 1;
 });

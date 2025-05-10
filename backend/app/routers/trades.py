@@ -1,11 +1,11 @@
 from fastapi import APIRouter, HTTPException
-from app.models.trade import Trade
-from app.models.portfolio import Portfolio
+from models.trade import Trade
+from models.portfolio import Portfolio
 from pydantic import BaseModel
 from bson import ObjectId
 from datetime import datetime
 
-from app.blockchain.utils import register_trade_on_chain
+from blockchain.utils import register_trade_on_chain
 
 router = APIRouter()
 
@@ -71,7 +71,7 @@ async def create_trade(trade: TradeRequest):
         "tx_hash": tx_hash
     }
     
-from app.blockchain.utils import get_trades_from_chain
+from blockchain.utils import get_trades_from_chain
 
 @router.get("/onchain/{user_address}", response_model=list)
 def get_onchain_trades(user_address: str):
@@ -81,5 +81,5 @@ def get_onchain_trades(user_address: str):
     except Exception as e:
         import traceback
         print("❌ Blockchain read error:")
-        traceback.print_exc()  # Afișează toată eroarea în consolă
+        traceback.print_exc() 
         raise HTTPException(status_code=500, detail=f"Blockchain read error: {str(e)}")
