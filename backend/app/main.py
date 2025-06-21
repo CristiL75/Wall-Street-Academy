@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 
-from routers import users, trades, portfolios, leaderboard, auth, recommendations, stocks  
+from routers import users, trades, portfolios, leaderboard, auth, recommendations, stocks, chart  
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -35,6 +35,8 @@ app.include_router(leaderboard.router, prefix="/leaderboard", tags=["Leaderboard
 app.include_router(auth.router, prefix="/auth", tags=["Auth"]) 
 app.include_router(recommendations.router, prefix="/recommendations", tags=["AI"])  
 app.include_router(stocks.router, prefix="/stocks", tags=["Stocks"])
+app.include_router(chart.router) 
+
 
 @app.get("/")
 def read_root():

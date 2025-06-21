@@ -3,7 +3,7 @@ from pydantic import Field
 from bson import ObjectId
 from datetime import datetime
 from enum import Enum
-
+from typing import Optional
 
 class TradeType(str, Enum):
     buy = "buy"
@@ -32,6 +32,7 @@ class Trade(Document):
     commission: float = 0.0
     status: str = "pending"
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+    blockchain_tx: Optional[str] = None  # Add this field
 
     class Settings:
         name = "trades"

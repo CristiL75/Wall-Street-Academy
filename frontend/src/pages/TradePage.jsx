@@ -2,17 +2,8 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { getTokenPayload } from "../utils/auth";
 import { Line } from "react-chartjs-2";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  LineElement,
-  PointElement,
-  Tooltip,
-  Legend
-} from "chart.js";
 
-ChartJS.register(CategoryScale, LinearScale, LineElement, PointElement, Tooltip, Legend);
+
 
 const TradePage = () => {
   const [userId, setUserId] = useState(null);
@@ -20,16 +11,40 @@ const TradePage = () => {
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [quantity, setQuantity] = useState(0);
   const [price, setPrice] = useState(null);
-  const [chartData, setChartData] = useState(null);
   const [feedback, setFeedback] = useState("");
 
   useEffect(() => {
     const payload = getTokenPayload();
     if (payload?.sub) {
       setUserId(payload.sub);
+      checkUserPortfolio(payload.sub);
       fetchCompanies();
     }
   }, []);
+
+
+  const checkUserPortfolio = async (userId) => {
+  try {
+    // First check if portfolio exists
+    await axios.get(`http://127.0.0.1:8000/portfolios/${userId}`);
+    console.log("Portfolio exists");
+  } catch (err) {
+    if (err.response && err.response.status === 404) {
+      // Portfolio doesn't exist, create one
+      try {
+        const res = await axios.post(`http://127.0.0.1:8000/portfolios/`, {
+          user_id: userId,
+          cash: 100000 // Initial balance
+        });
+        console.log("Created portfolio:", res.data);
+        setFeedback("Portofoliu creat cu un sold inițial de $100,000");
+      } catch (createErr) {
+        console.error("Failed to create portfolio:", createErr);
+        setFeedback("❌ Eroare la crearea portofoliului");
+      }
+    }
+  }
+};
 
   const fetchCompanies = async () => {
     try {
@@ -53,59 +68,101 @@ const TradePage = () => {
   const handleCompanyClick = async (company) => {
     setSelectedCompany(company);
     await fetchPrice(company.symbol);
-    await fetchChart(company.symbol);
+ 
   };
 
-  const fetchPrice = async (symbol) => {
-    try {
-      const res = await axios.get(`/price/${symbol}`);
-      setPrice(res.data.price);
-    } catch (err) {
-      console.error("Error fetching price:", err);
+// Replace fetchPrice function with this version that doesn't need a dedicated endpoint
+const fetchPrice = async (symbol) => {
+  try {
+    // Get all stocks and filter for the symbol we need
+    const res = await axios.get("http://127.0.0.1:8000/stocks/");
+    
+    if (Array.isArray(res.data)) {
+      const stock = res.data.find(s => s.symbol === symbol);
+      
+      if (stock) {
+        // Extract price from the stock data
+        if (stock.last_price) {
+          setPrice(stock.last_price);
+        } else if (stock.price) {
+          setPrice(stock.price);
+        } else {
+          console.error("Price data not found in stock object:", stock);
+          setPrice(null);
+        }
+      } else {
+        console.error(`Stock with symbol ${symbol} not found in response`);
+        setPrice(null);
+      }
+    } else {
+      console.error("Invalid response format from /stocks/ endpoint:", res.data);
       setPrice(null);
     }
-  };
+  } catch (err) {
+    console.error("Error fetching price:", err);
+    setPrice(null);
+  }
+};
 
-  const fetchChart = async (symbol) => {
-    try {
-      const res = await axios.get(`/api/chart/${symbol}`);
-      const { labels, values } = res.data;
-      setChartData({
-        labels,
-        datasets: [
-          {
-            label: `${symbol} Price Evolution`,
-            data: values,
-            fill: false,
-            borderColor: "rgb(75, 192, 192)",
-            tension: 0.1
-          }
-        ]
-      });
-    } catch (err) {
-      console.error("Chart load error:", err);
-    }
-  };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!userId || quantity <= 0 || !selectedCompany) return;
-    try {
-      await axios.post("/trades/", {
-        user_id: userId,
-        symbol: selectedCompany.symbol,
-        quantity: Number(quantity),
-        trade_type: "buy",
-        order_type: "market",
-        execution_price: price,
-        commission: 0,
-      });
-      setFeedback("✅ Tranzacție efectuată cu succes!");
-    } catch (err) {
-      console.error("Trade failed:", err);
-      setFeedback("❌ Eroare la efectuarea tranzacției.");
-    }
+
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!userId || quantity <= 0 || !selectedCompany || price === null) {
+    setFeedback("❌ Eroare: Lipsesc informații necesare pentru tranzacție");
+    return;
+  }
+  
+  // Create payload with all required fields and ensure price is a number
+  const payload = {
+    user_id: userId,
+    symbol: selectedCompany.symbol,
+    quantity: Number(quantity),
+    trade_type: "buy",
+    order_type: "market",
+    execution_price: Number(price), // Convert to number explicitly
+    commission: 0,
   };
+  
+  console.log("Submitting trade with payload:", payload); 
+  
+  try {
+    const response = await axios.post("http://127.0.0.1:8000/trades/", payload);
+    console.log("Trade response:", response.data);
+    setFeedback("✅ Tranzacție efectuată cu succes!");
+    
+    // Reset quantity after successful transaction
+    setQuantity(0);
+    
+    // Actualizează portofoliul după tranzacție reușită
+    try {
+      // Așteaptă puțin pentru a permite backend-ului să proceseze tranzacția complet
+      setTimeout(async () => {
+        // Obținem portofoliul actualizat
+        const portfolioRes = await axios.get(`http://127.0.0.1:8000/portfolios/${userId}`);
+        console.log("Portfolio updated after trade:", portfolioRes.data);
+        
+        // Opțional: Poți seta un feedback suplimentar
+        setFeedback(prev => `${prev} Portofoliul a fost actualizat.`);
+      }, 1000); // Așteaptă 1 secundă
+    } catch (refreshErr) {
+      console.error("Failed to refresh portfolio data:", refreshErr);
+    }
+  }
+  catch (err) {
+    console.error("Trade failed:", err);
+    
+    if (err.response) {
+      console.error("Error data:", err.response.data);
+      console.error("Error status:", err.response.status);
+      
+      // Show more specific error message
+      setFeedback(`❌ Eroare: ${err.response.data?.detail?.[0]?.msg || err.response.data?.detail || "Unknown error"}`);
+    } else {
+      setFeedback(`❌ Eroare la efectuarea tranzacției: ${err.message}`);
+    }
+  }
+};
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -134,11 +191,29 @@ const TradePage = () => {
         </div>
       )}
 
-      {chartData && (
-        <div className="mb-6">
-          <Line data={chartData} />
-        </div>
-      )}
+      {/* Price information card instead of chart */}
+{price && (
+  <div className="mb-6 p-6 bg-white border rounded-lg shadow-sm">
+    <div className="flex flex-col items-center">
+      <h3 className="text-lg font-medium text-gray-700 mb-2">Current Market Price</h3>
+      <div className="text-3xl font-bold text-blue-600">${price}</div>
+      <div className="mt-4 bg-blue-50 px-4 py-2 rounded-full">
+        <span className="text-sm text-blue-700">Last updated: {new Date().toLocaleTimeString()}</span>
+      </div>
+    </div>
+    
+    <div className="grid grid-cols-2 gap-4 mt-6">
+      <div className="bg-gray-50 p-3 rounded">
+        <p className="text-sm text-gray-500">Market Hours</p>
+        <p className="font-medium">9:30 AM - 4:00 PM ET</p>
+      </div>
+      <div className="bg-gray-50 p-3 rounded">
+        <p className="text-sm text-gray-500">Currency</p>
+        <p className="font-medium">USD ($)</p>
+      </div>
+    </div>
+  </div>
+)}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <input

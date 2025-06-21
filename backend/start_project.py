@@ -11,6 +11,10 @@ def run_command(command, cwd=None, wait=True):
         process.communicate()
     return process
 
+def start_mongodb():
+    print("🍃 Pornim MongoDB server...")
+    return run_command("mongod", wait=False)
+
 # Functie sa pornim Hardhat node-ul
 
 def start_blockchain_node():
