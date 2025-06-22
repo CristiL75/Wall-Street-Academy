@@ -4,6 +4,7 @@ import Login from "./pages/LoginPage";
 import Signup from "./pages/Signup";
 import Profile from "./pages/Profile";
 import TradePage from "./pages/TradePage";
+import NewsPage from "./pages/NewsPage";
 import PrivateRoute from "./components/PrivateRoute";
 import { isAuthenticated } from "./utils/auth";
 import Navbar from "./components/Navbar";
@@ -45,6 +46,14 @@ const AppWrapper = () => {
           element={
             <PrivateRoute>
               <TradePage />
+            </PrivateRoute>
+          }
+        />
+               <Route
+          path="/news"
+          element={
+            <PrivateRoute>
+              <NewsPage />
             </PrivateRoute>
           }
         />

@@ -1,11 +1,15 @@
 from fastapi import FastAPI
 
 
-from routers import users, trades, portfolios, leaderboard, auth, recommendations, stocks, chart  
+from routers import users, trades, portfolios, leaderboard, auth, recommendations, stocks, chart, news  
 
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Wall Street Academy API")
+
+
+# Adaugă imediat după definirea app = FastAPI()
+
 
 
 app.add_middleware(
@@ -35,7 +39,9 @@ app.include_router(leaderboard.router, prefix="/leaderboard", tags=["Leaderboard
 app.include_router(auth.router, prefix="/auth", tags=["Auth"]) 
 app.include_router(recommendations.router, prefix="/recommendations", tags=["AI"])  
 app.include_router(stocks.router, prefix="/stocks", tags=["Stocks"])
+app.include_router(news.router, prefix="/news", tags=["News"])
 app.include_router(chart.router) 
+
 
 
 @app.get("/")
