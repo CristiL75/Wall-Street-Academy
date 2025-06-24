@@ -248,21 +248,19 @@ async def get_stock_historical_data(symbol: str, period: str = "6mo"):
         logger.error(f"Error getting historical data for {symbol}: {str(e)}")
         return None
 
-# Funcții helper
 async def get_user_data(user_id: str):
     """Obține toate datele relevante despre un utilizator."""
-    user = await User.get(user_id)
+    user = await User.get(PydanticObjectId(user_id))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Portofoliu utilizator
-    portfolio = await Portfolio.find_one(Portfolio.user_id == user_id)
+    # Portofoliu utilizator - CORECTARE
+    portfolio = await Portfolio.find_one({"user_id": PydanticObjectId(user_id)})
     
     # Istoricul tranzacțiilor utilizatorului
-    trades = await Trade.find(Trade.user_id == user_id).sort([("timestamp", DESCENDING)]).to_list()
+    trades = await Trade.find(Trade.user_id == str(user_id)).sort([("timestamp", DESCENDING)]).to_list()
     
     return {"user": user, "portfolio": portfolio, "trades": trades}
-
 async def get_portfolio_stats(portfolio):
     """Obține statistici detaliate despre portofoliul utilizatorului."""
     if not portfolio or not portfolio.holdings:
@@ -628,7 +626,7 @@ async def portfolio_based_recommendations(user_id: str, n_recommendations: int =
     """Generează recomandări bazate direct pe portofoliul curent al utilizatorului."""
     try:
         # Obține portofoliul utilizatorului
-        portfolio = await Portfolio.find_one(Portfolio.user_id == user_id)
+        portfolio = await Portfolio.find_one({"user_id": PydanticObjectId(user_id)})
         if not portfolio or not portfolio.holdings:
             return []
         
@@ -734,12 +732,17 @@ async def portfolio_based_recommendations(user_id: str, n_recommendations: int =
 async def investment_goal_recommendations(user_id: str, n_recommendations: int = 5):
     """Generează recomandări bazate pe obiectivele de investiții ale utilizatorului."""
     try:
-        # Obține profilul utilizatorului
-        user = await User.get(user_id)
-        if not user:
+        # Folosește User.get cu PydanticObjectId
+        try:
+            user = await User.get(PydanticObjectId(user_id))
+            if not user:
+                logger.warning(f"Investment goal recommendations: User {user_id} not found")
+                return []
+        except Exception as e:
+            logger.error(f"Error finding user in investment_goal_recommendations: {str(e)}")
             return []
-            
-        # Analizează stilul de tranzacționare pentru a deduce obiectivele
+        
+  
         trading_style = await analyze_user_trading_style(user_id)
         
         # Setează obiectivele implicite dacă nu avem informații suficiente
@@ -778,7 +781,7 @@ async def investment_goal_recommendations(user_id: str, n_recommendations: int =
             investment_goals["income"] -= 0.1
         
         # Obține portofoliul pentru a exclude acțiunile deja deținute
-        portfolio = await Portfolio.find_one(Portfolio.user_id == user_id)
+        portfolio = await Portfolio.find_one(Portfolio.user_id == PydanticObjectId(user_id))
         owned_symbols = []
         if portfolio and portfolio.holdings:
             owned_symbols = [holding.symbol for holding in portfolio.holdings]
@@ -830,68 +833,170 @@ async def investment_goal_recommendations(user_id: str, n_recommendations: int =
         return []
 
 async def collaborative_filtering(user_id: str, matrix: Dict, symbols: List[str], n_recommendations: int = 5):
-    """Recomandă acțiuni folosind filtrare colaborativă."""
+    """Recomandă acțiuni folosind filtrare colaborativă cu scikit-learn în loc de Surprise."""
     try:
         if not matrix or user_id not in matrix:
+            logger.warning(f"Cannot generate collaborative recommendations for user {user_id}: insufficient data")
             return []
         
-        # Convertim matricea într-un DataFrame pandas pentru algoritmul de învecini cei mai apropiați
+        # Verificăm dacă avem simboluri pentru a evita eroarea cu 0 caracteristici
+        if not symbols:
+            logger.warning("Collaborative filtering: No symbols available")
+            return []
+            
+        # Evităm importarea Surprise și utilizăm doar scikit-learn
+        from sklearn.metrics.pairwise import cosine_similarity
+        import numpy as np
+        
+        # Convertim matricea user-item într-un format adecvat pentru sklearn
         users = list(matrix.keys())
+        user_idx = {u: i for i, u in enumerate(users)}
+        symbol_idx = {s: i for i, s in enumerate(symbols)}
+        
+        # Creăm matricea de utilizare
+        user_item_matrix = np.zeros((len(users), len(symbols)))
+        
+        # Populăm matricea cu scoruri
+        for u, ratings in matrix.items():
+            if u in user_idx:  # Verificăm dacă utilizatorul există în index
+                i = user_idx[u]
+                for s, score in ratings.items():
+                    if s in symbol_idx:  # Verificăm dacă simbolul există în index
+                        j = symbol_idx[s]
+                        user_item_matrix[i, j] = score
+        
+        # Verificăm dacă avem suficiente date
+        if len(users) < 2:
+            logger.warning("Not enough users for collaborative filtering")
+            return await collaborative_filtering_fallback(user_id, matrix, symbols, n_recommendations)
+        
+        # Calculăm similaritatea între utilizatori
+        user_similarity = cosine_similarity(user_item_matrix)
+        
+        # Obține indexul utilizatorului curent
+        if user_id not in user_idx:
+            return await collaborative_filtering_fallback(user_id, matrix, symbols, n_recommendations)
+        current_user_idx = user_idx[user_id]
+        
+        # Obține similaritățile cu alți utilizatori (sortate)
+        similarities = user_similarity[current_user_idx]
+        similar_users = [(users[i], similarities[i]) for i in range(len(users)) if i != current_user_idx]
+        similar_users.sort(key=lambda x: x[1], reverse=True)
+        
+        # Obține portofoliul utilizatorului pentru a exclude acțiuni deja deținute
+        portfolio = await Portfolio.find_one(Portfolio.user_id == PydanticObjectId(user_id))
+        owned_symbols = []
+        if portfolio and portfolio.holdings:
+            owned_symbols = [h.symbol for h in portfolio.holdings]
+        
+        # Generează recomandările
+        recommendations = {}
+        for sim_user_id, similarity in similar_users[:5]:  # Top 5 utilizatori similari
+            if similarity <= 0:  # Ignoră utilizatorii nesimilari
+                continue
+                
+            # Găsește acțiunile pe care utilizatorul similar le-a evaluat pozitiv
+            for symbol, score in matrix[sim_user_id].items():
+                if score > 0 and symbol not in owned_symbols:
+                    if symbol not in matrix[user_id] or matrix[user_id][symbol] <= 0:
+                        if symbol not in recommendations:
+                            recommendations[symbol] = 0
+                        recommendations[symbol] += score * similarity
+        
+        # Sortează și returnează cele mai bune recomandări
+        sorted_recs = sorted(recommendations.items(), key=lambda x: x[1], reverse=True)
+        result = [symbol for symbol, _ in sorted_recs[:n_recommendations]]
+        
+        # Dacă nu avem suficiente recomandări, completează cu metoda fallback
+        if len(result) < n_recommendations:
+            logger.info(f"Collaborative filtering generated only {len(result)} recommendations. Adding fallback recommendations.")
+            fallback_recs = await collaborative_filtering_fallback(
+                user_id, matrix, symbols, n_recommendations - len(result))
+            
+            for symbol in fallback_recs:
+                if symbol not in result:
+                    result.append(symbol)
+                    if len(result) >= n_recommendations:
+                        break
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error in collaborative filtering: {str(e)}", exc_info=True)
+        return await collaborative_filtering_fallback(user_id, matrix, symbols, n_recommendations)
+
+async def collaborative_filtering_fallback(user_id: str, matrix: Dict, symbols: List[str], n_recommendations: int = 5):
+    """Implementare robustă a filtrării colaborative folosind algoritmul de vecini apropiați."""
+    try:
+        if not matrix or user_id not in matrix:
+            logger.warning(f"Collaborative filtering fallback: No data for user {user_id}")
+            return []
+        
+        # Verifică dacă avem simboluri
+        if not symbols:
+            logger.warning("Collaborative filtering fallback: No symbols available")
+            return []
+        
+        # Verifică dacă avem suficienți utilizatori
+        users = list(matrix.keys())
+        if len(users) < 2:
+            logger.warning("Collaborative filtering fallback: Not enough users")
+            # Returnează câteva simboluri populare
+            popular_symbols = symbols[:min(n_recommendations, len(symbols))]
+            return popular_symbols
+        
+        # Construiește matricea de utilizatori-simboluri
         user_vectors = np.zeros((len(users), len(symbols)))
         
         for i, uid in enumerate(users):
             for j, symbol in enumerate(symbols):
                 user_vectors[i, j] = matrix[uid].get(symbol, 0)
         
-        # Găsim utilizatorii similari
+        # Utilizează NearestNeighbors pentru a găsi utilizatori similari
+        from sklearn.neighbors import NearestNeighbors
         model = NearestNeighbors(n_neighbors=min(5, len(users)), algorithm='brute', metric='cosine')
         model.fit(user_vectors)
         
+        # Găsește utilizatori similari
         user_index = users.index(user_id)
-        user_vector = user_vectors[user_index:user_index+1]
-        
-        # Nu putem calcula vecini dacă avem doar un utilizator
-        if len(users) <= 1:
-            return []
+        user_vector = user_vectors[user_index].reshape(1, -1)  # Asigură-te că are forma corectă
         
         distances, indices = model.kneighbors(user_vector)
         
-        # Calculăm scorurile de recomandare în funcție de asemănarea cu alți utilizatori
+        # Calculează scoruri pentru recomandări
         recommendation_scores = {}
         
-        for i in range(1, len(indices[0])):  # Începem de la 1 pentru a sări peste utilizatorul însuși
+        for i in range(1, len(indices[0])):  # Începe de la 1 pentru a sări peste utilizatorul însuși
             neighbor_idx = indices[0][i]
             neighbor_id = users[neighbor_idx]
-            similarity = 1 - distances[0][i]  # Convertim distanța în similaritate
+            similarity = 1 - distances[0][i]
             
-            # Obținem simbolurile pe care vecinul le-a evaluat pozitiv
-            for symbol, score in matrix[neighbor_id].items():
-                if score > 0:  # Considerăm doar evaluările pozitive
-                    # Verifică dacă utilizatorul curent nu are deja o evaluare pozitivă
-                    if matrix[user_id].get(symbol, 0) <= 0:
-                        if symbol not in recommendation_scores:
-                            recommendation_scores[symbol] = 0
-                        recommendation_scores[symbol] += score * similarity
+            # Găsește acțiuni pozitive la utilizatorii similari
+            for j, symbol in enumerate(symbols):
+                neighbor_score = user_vectors[neighbor_idx, j]
+                user_score = user_vectors[user_index, j]
+                
+                if neighbor_score > 0 and user_score <= 0:
+                    if symbol not in recommendation_scores:
+                        recommendation_scores[symbol] = 0
+                    recommendation_scores[symbol] += neighbor_score * similarity
         
-        # Sortăm recomandările după scor
-        sorted_recommendations = sorted(
-            recommendation_scores.items(), 
-            key=lambda x: x[1], 
-            reverse=True
-        )
-        
-        return [symbol for symbol, _ in sorted_recommendations[:n_recommendations]]
+        # Sortează și returnează recomandările
+        sorted_recs = sorted(recommendation_scores.items(), key=lambda x: x[1], reverse=True)
+        return [symbol for symbol, _ in sorted_recs[:n_recommendations]]
     except Exception as e:
-        logger.error(f"Error in collaborative filtering: {str(e)}")
-        return []
+        logger.error(f"Error in collaborative filtering fallback: {str(e)}", exc_info=True)
+        # Returnează câteva simboluri populare dacă totul eșuează
+        return symbols[:min(n_recommendations, len(symbols))]
+
 
 async def content_based_filtering(user_id: str, n_recommendations: int = 5):
     """Recomandă acțiuni bazate pe conținut (sectoare și caracteristici similare)."""
     try:
-        # Obține portofoliul utilizatorului
-        portfolio = await Portfolio.find_one(Portfolio.user_id == user_id)
+        # Obține portofoliul utilizatorului - CORECTARE
+        portfolio = await Portfolio.find_one({"user_id": PydanticObjectId(user_id)})
         if not portfolio or not portfolio.holdings:
             return []
+        
         
         # Obține toate simbolurile deținute de utilizator
         user_symbols = [holding.symbol for holding in portfolio.holdings]
@@ -969,43 +1074,63 @@ async def technical_analysis(symbols: List[str], n_recommendations: int = 5):
             if data is None or data.empty:
                 continue
                 
+            # Verifică dacă acțiunea este în trend negativ recent (ultimele 7 zile)
+            recent_trend = data['Close'].iloc[-7:].pct_change().mean() * 100
+            if recent_trend < -2.5:  # Ignoră acțiuni cu trend negativ puternic
+                continue
+                
             # Calculăm scorul tehnic
             technical_score = 0
             
             # 1. Trend SMA: prețul peste SMA20/50 = bullish
             if data['Close'].iloc[-1] > data['SMA_20'].iloc[-1]:
-                technical_score += 1
+                technical_score += 1.5  # Accentuează importanța trendului pozitiv
+            else:
+                technical_score -= 0.5  # Penalizează trend negativ
+                
             if data['Close'].iloc[-1] > data['SMA_50'].iloc[-1]:
-                technical_score += 1
+                technical_score += 1.5
             if data['SMA_20'].iloc[-1] > data['SMA_50'].iloc[-1]:  # Golden cross-like
-                technical_score += 1
+                technical_score += 2
                 
             # 2. RSI: supraachiziționat (>70) sau supravândut (<30)
             last_rsi = data['RSI'].iloc[-1]
             if last_rsi < 30:  # Supravândut = oportunitate de cumpărare
                 technical_score += 2
             elif last_rsi > 70:  # Supraachiziționat = evită
-                technical_score -= 2
+                technical_score -= 3  # Penalizare mai mare pentru zone supraacomodate
             
             # 3. MACD: poziție și trend
             if data['MACD'].iloc[-1] > data['MACD_Signal'].iloc[-1]:  # MACD peste linia de semnal
-                technical_score += 1
+                technical_score += 1.5
+            else:
+                technical_score -= 0.5  # Penalizare pentru MACD negativ
+                
             if data['MACD'].iloc[-1] > 0:  # MACD pozitiv
-                technical_score += 1
+                technical_score += 1.5
             
-            # 4. Tendință de preț: verificăm ultimele 5 zile
+            # 4. Tendință de preț: verificăm ultimele 5 zile - accentuăm importanța
             recent_trend = data['Close'].iloc[-5:].pct_change().mean() * 100
-            if recent_trend > 0:
+            if recent_trend > 1:  # Trend puternic pozitiv
+                technical_score += 2
+            elif recent_trend > 0:  # Trend ușor pozitiv
                 technical_score += 1
+            else:  # Trend negativ
+                technical_score -= 1  # Penalizăm trend negativ
             
-            # 5. Volatilitate: preferăm volatilitate moderată
-            volatility = data['Volatility'].iloc[-1]
-            if 0.1 <= volatility <= 0.3:  # Volatilitate moderată
-                technical_score += 1
-            elif volatility > 0.4:  # Volatilitate foarte mare
-                technical_score -= 1
+            # 5. Performanță pe o lună - ADĂUGAT
+            if len(data) >= 22:
+                one_month_perf = (data['Close'].iloc[-1] / data['Close'].iloc[-22] - 1) * 100
+                if one_month_perf > 5:  # Performanță peste 5%
+                    technical_score += 2
+                elif one_month_perf > 0:  # Performanță pozitivă
+                    technical_score += 1
+                elif one_month_perf < -5:  # Performanță foarte negativă
+                    technical_score -= 2  # Penalizare mare pentru performanță slabă
             
-            results[symbol] = technical_score
+            # Acceptă doar acțiuni cu scor tehnic pozitiv
+            if technical_score > 0:
+                results[symbol] = technical_score
         
         # Sortăm și returnăm cele mai promițătoare acțiuni
         sorted_results = sorted(results.items(), key=lambda x: x[1], reverse=True)
@@ -1091,7 +1216,7 @@ async def diversification_recommendations(user_id: str, n_recommendations: int =
     """Recomandă acțiuni pentru a diversifica portofoliul."""
     try:
         # Obține portofoliul utilizatorului
-        portfolio = await Portfolio.find_one(Portfolio.user_id == user_id)
+        portfolio = await Portfolio.find_one(Portfolio.user_id == PydanticObjectId(user_id))
         if not portfolio or not portfolio.holdings:
             return []
         
@@ -1351,19 +1476,24 @@ async def get_market_overview():
 async def get_recommendations(
     user_id: str, 
     limit: int = Query(5, ge=1, le=10),
-    include_details: bool = Query(True)
+    include_details: bool = Query(True),
+    min_performance: float = Query(-3.0, description="Performanța minimă la 1 lună acceptabilă (%)"),
+    filter_negative: bool = Query(True, description="Filtrează acțiunile cu performanță puternic negativă")
 ):
     """Obține recomandări personalizate pentru un utilizator."""
     try:
         # Verifică dacă utilizatorul există
-        user = await User.get(user_id)
-        if not user:
+        try:
+            user = await User.get(PydanticObjectId(user_id))
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+        except Exception as e:
+            logger.error(f"Error finding user {user_id}: {str(e)}")
             raise HTTPException(status_code=404, detail="User not found")
         
-        # Obține portofoliul utilizatorului pentru a înțelege mai bine preferințele
-        portfolio = await Portfolio.find_one(Portfolio.user_id == user_id)
-        has_portfolio = portfolio and portfolio.holdings and len(portfolio.holdings) > 0
-        
+        # Obține portofoliul utilizatorului pentru a înțelege mai bine preferințele - CORECTARE
+        portfolio = await Portfolio.find_one({"user_id": PydanticObjectId(user_id)})
+        has_portfolio = portfolio is not None and hasattr(portfolio, 'holdings') and portfolio.holdings and len(portfolio.holdings) > 0
         # Logică specifică pentru a genera recomandări bazate pe portofoliu
         logger.info(f"Generating recommendations for user {user_id}, has portfolio: {has_portfolio}")
         
@@ -1373,7 +1503,14 @@ async def get_recommendations(
         # --- 1. Obține simboluri din toate sursele posibile pentru analiză tehnică ---
         
         # Simboluri din tranzacțiile utilizatorilor (colaborative)
-        matrix, collab_symbols = await build_user_trade_matrix()
+        try:
+            matrix, collab_symbols = await build_user_trade_matrix()
+            # Adaugă simboluri implicite dacă nu există
+            if not collab_symbols:
+                collab_symbols = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NFLX", "DIS", "JNJ", "PG"]
+        except Exception as e:
+            logger.error(f"Error building user trade matrix: {str(e)}")
+            matrix, collab_symbols = {}, ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NFLX", "DIS", "JNJ", "PG"]
         
         # Simboluri din portofoliul utilizatorului
         portfolio_symbols = []
@@ -1381,67 +1518,103 @@ async def get_recommendations(
             portfolio_symbols = [h.symbol for h in portfolio.holdings]
             
         # Simboluri populare din baza de date pentru fallback
-        db_stocks = await Stock.find_all().sort([("market_cap", -1)]).limit(50).to_list()
-        db_symbols = [s.symbol for s in db_stocks if hasattr(s, 'symbol')]
+        try:
+            db_stocks = await Stock.find_all().sort([("market_cap", -1)]).limit(50).to_list()
+            db_symbols = [s.symbol for s in db_stocks if hasattr(s, 'symbol')]
+        except Exception as e:
+            logger.error(f"Error getting stocks from database: {str(e)}")
+            db_symbols = []
         
         # Combinăm toate simbolurile posibile pentru analiză tehnică
         all_analysis_symbols = list(set(collab_symbols + portfolio_symbols + db_symbols))
         
+        # Asigurăm-ne că avem simboluri pentru recomandări
+        if not all_analysis_symbols:
+            logger.warning(f"No symbols available for recommendations for user {user_id}")
+            all_analysis_symbols = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NFLX"]
+        
         # --- 2. Generează recomandări din fiecare sursă separat ---
         
         # Analiză tehnică - va funcționa pentru toți utilizatorii
-        tech_symbols = await technical_analysis(all_analysis_symbols[:50], n_recommendations=limit*2)
-        for symbol in tech_symbols:
-            if symbol not in recommendations:
-                recommendations[symbol] = set()
-            recommendations[symbol].add("technical_analysis")
+        try:
+            tech_symbols = await technical_analysis(all_analysis_symbols[:50], n_recommendations=limit*2)
+            for symbol in tech_symbols:
+                if symbol not in recommendations:
+                    recommendations[symbol] = set()
+                recommendations[symbol].add("technical_analysis")
+        except Exception as e:
+            logger.error(f"Error in technical analysis: {str(e)}")
         
         # Recomandări bazate pe portofoliu - doar pentru utilizatorii cu portofoliu
         if has_portfolio:
             # Portfolio-based
-            portfolio_recs = await portfolio_based_recommendations(user_id, n_recommendations=limit)
-            for symbol in portfolio_recs:
-                if symbol not in recommendations:
-                    recommendations[symbol] = set()
-                recommendations[symbol].add("portfolio_based")
+            try:
+                portfolio_recs = await portfolio_based_recommendations(user_id, n_recommendations=limit)
+                for symbol in portfolio_recs:
+                    if symbol not in recommendations:
+                        recommendations[symbol] = set()
+                    recommendations[symbol].add("portfolio_based")
+            except Exception as e:
+                logger.error(f"Error in portfolio-based recommendations: {str(e)}")
             
             # Risk-based
-            risk_recs = await risk_based_recommendations(user_id, n_recommendations=limit)
-            for symbol in risk_recs:
-                if symbol not in recommendations:
-                    recommendations[symbol] = set()
-                recommendations[symbol].add("risk_based")
+            try:
+                risk_recs = await risk_based_recommendations(user_id, n_recommendations=limit)
+                for symbol in risk_recs:
+                    if symbol not in recommendations:
+                        recommendations[symbol] = set()
+                    recommendations[symbol].add("risk_based")
+            except Exception as e:
+                logger.error(f"Error in risk-based recommendations: {str(e)}")
                 
             # Diversification
-            div_recs = await diversification_recommendations(user_id, n_recommendations=limit)
-            for symbol in div_recs:
-                if symbol not in recommendations:
-                    recommendations[symbol] = set()
-                recommendations[symbol].add("diversification")
+            try:
+                div_recs = await diversification_recommendations(user_id, n_recommendations=limit)
+                for symbol in div_recs:
+                    if symbol not in recommendations:
+                        recommendations[symbol] = set()
+                    recommendations[symbol].add("diversification")
+            except Exception as e:
+                logger.error(f"Error in diversification recommendations: {str(e)}")
                 
             # Content-based
-            content_recs = await content_based_filtering(user_id, n_recommendations=limit)
-            for symbol in content_recs:
-                if symbol not in recommendations:
-                    recommendations[symbol] = set()
-                recommendations[symbol].add("content_based_filtering")
+            try:
+                content_recs = await content_based_filtering(user_id, n_recommendations=limit)
+                for symbol in content_recs:
+                    if symbol not in recommendations:
+                        recommendations[symbol] = set()
+                    recommendations[symbol].add("content_based_filtering")
+            except Exception as e:
+                logger.error(f"Error in content-based filtering: {str(e)}")
         
         # Recomandări bazate pe alți utilizatori - doar dacă există alți utilizatori
         if matrix and len(matrix) > 1 and user_id in matrix:
-            collab_recs = await collaborative_filtering(user_id, matrix, collab_symbols, n_recommendations=limit)
-            for symbol in collab_recs:
-                if symbol not in recommendations:
-                    recommendations[symbol] = set()
-                recommendations[symbol].add("collaborative_filtering")
+            try:
+                collab_recs = await collaborative_filtering(user_id, matrix, collab_symbols, n_recommendations=limit)
+                for symbol in collab_recs:
+                    if symbol not in recommendations:
+                        recommendations[symbol] = set()
+                    recommendations[symbol].add("collaborative_filtering")
+            except Exception as e:
+                logger.error(f"Error in collaborative filtering: {str(e)}")
         
         # Recomandări bazate pe obiective - încearcă pentru toți utilizatorii
-        goal_recs = await investment_goal_recommendations(user_id, n_recommendations=limit)
-        for symbol in goal_recs:
-            if symbol not in recommendations:
-                recommendations[symbol] = set()
-            recommendations[symbol].add("investment_goals")
+        try:
+            goal_recs = await investment_goal_recommendations(user_id, n_recommendations=limit)
+            for symbol in goal_recs:
+                if symbol not in recommendations:
+                    recommendations[symbol] = set()
+                recommendations[symbol].add("investment_goals")
+        except Exception as e:
+            logger.error(f"Error in investment goal recommendations: {str(e)}")
         
         # --- 3. Combină și prioritizează recomandările ---
+        
+        # Verificăm dacă avem recomandări
+        if not recommendations:
+            # Folosim stocurile populare ca fallback dacă nu avem recomandări
+            for symbol in db_symbols[:limit*2]:  # Luăm mai multe pentru a permite filtrarea ulterioară
+                recommendations[symbol] = set(["popular_stocks"])
         
         # Sortăm recomandările după numărul de surse diferite care le sugerează
         sorted_recommendations = sorted(
@@ -1450,96 +1623,190 @@ async def get_recommendations(
             reverse=True
         )
         
-        # Limităm numărul de recomandări
-        final_recommendations = [symbol for symbol, _ in sorted_recommendations[:limit]]
+        # Inițial luăm mai multe recomandări pentru a putea filtra ulterior
+        pre_filter_recommendations = [symbol for symbol, _ in sorted_recommendations[:limit*2]]
+        
+        # Obținem detaliile pentru toate aceste acțiuni pentru a le putea filtra
+        stock_details = {}
+        try:
+            stock_details = await get_stock_details(pre_filter_recommendations)
+        except Exception as e:
+            logger.error(f"Error getting stock details: {str(e)}")
+        
+        # --- Filtrez recomandările în funcție de performanță și calitate ---
+        high_quality_recommendations = []
+        medium_quality_recommendations = []
+        
+        for symbol in pre_filter_recommendations:
+            if symbol in stock_details:
+                # Verifică performanță negativă
+                if filter_negative and "performance" in stock_details[symbol]:
+                    one_month_perf = stock_details[symbol]["performance"]["1_month"]
+                    three_month_perf = stock_details[symbol]["performance"]["3_month"]
+                    
+                    # Exclude acțiuni cu performanță foarte proastă
+                    if one_month_perf < -10 or (one_month_perf < -5 and three_month_perf < -10):
+                        logger.info(f"Filtering out {symbol} due to poor performance: 1m={one_month_perf}%, 3m={three_month_perf}%")
+                        continue
+                    
+                    # Verifică și indicatorii tehnici
+                    if "technical" in stock_details[symbol]:
+                        rsi = stock_details[symbol]["technical"]["rsi"]
+                        
+                        # Recomandări de înaltă calitate - tendință pozitivă cu indicator tehnic bun
+                        if ((one_month_perf >= 0 and three_month_perf >= 0) or 
+                            (one_month_perf > min_performance and rsi > 40 and rsi < 70)):
+                            high_quality_recommendations.append(symbol)
+                        # Recomandări de calitate medie - performanță rezonabilă sau indicator tehnic promițător
+                        elif one_month_perf > min_performance or (rsi < 30 and three_month_perf < -5):
+                            # RSI < 30 indică supravânzare, potențial de revenire
+                            medium_quality_recommendations.append(symbol)
+                    else:
+                        # Dacă nu avem date tehnice, folosim doar performanța
+                        if one_month_perf >= 0 and three_month_perf >= 0:
+                            high_quality_recommendations.append(symbol)
+                        elif one_month_perf > min_performance:
+                            medium_quality_recommendations.append(symbol)
+                else:
+                    # Dacă nu filtrăm după performanță sau nu avem date, includem în lista de calitate medie
+                    medium_quality_recommendations.append(symbol)
+        
+        # Combinăm recomandările, prioritizând pe cele de înaltă calitate
+        final_recommendations = high_quality_recommendations + medium_quality_recommendations
+        
+        # Dacă după filtrare nu mai avem suficiente recomandări, adăugăm din lista originală
+        if len(final_recommendations) < limit:
+            original_remaining = [s for s in pre_filter_recommendations if s not in final_recommendations]
+            final_recommendations.extend(original_remaining)
+        
+        # Limităm la numărul cerut
+        final_recommendations = final_recommendations[:limit]
         
         # --- 4. Generează rezultatul final ---
-        
         result = {"recommendations": []}
         
         if include_details:
-            stock_details = await get_stock_details(final_recommendations)
-            
             for symbol in final_recommendations:
                 if symbol in stock_details:
-                    # Calculăm scorul de încredere
+                    try:
+                        # Calculăm scorul de încredere
+                        sources_list = list(recommendations[symbol])
+                        max_sources = 7  # Număr maxim de surse posibile
+                        confidence = min((len(sources_list) / max_sources) * 100.0, 100.0)
+                        
+                        # Bonus pentru performanța pozitivă
+                        if "performance" in stock_details[symbol]:
+                            one_month_perf = stock_details[symbol]["performance"]["1_month"]
+                            if one_month_perf > 5:
+                                confidence = min(confidence + 10, 100.0)
+                            elif one_month_perf > 0:
+                                confidence = min(confidence + 5, 100.0)
+                        
+                        # Construim recomandarea
+                        recommendation = {
+                            "symbol": str(symbol),
+                            "details": {
+                                "symbol": str(stock_details[symbol]["symbol"]),
+                                "name": str(stock_details[symbol]["name"]),
+                                "sector": str(stock_details[symbol]["sector"]),
+                                "last_price": float(stock_details[symbol]["last_price"]),
+                                "market_cap": float(stock_details[symbol]["market_cap"]),
+                                "market_cap_formatted": str(stock_details[symbol]["market_cap_formatted"]),
+                            },
+                            "sources": sources_list,
+                            "confidence": float(confidence)
+                        }
+                        
+                        # Adăugă performanță
+                        if "performance" in stock_details[symbol]:
+                            recommendation["details"]["performance"] = {
+                                "1_month": float(stock_details[symbol]["performance"]["1_month"]),
+                                "3_month": float(stock_details[symbol]["performance"]["3_month"])
+                            }
+                        
+                        # Adăugă indicatori tehnici
+                        if "technical" in stock_details[symbol]:
+                            recommendation["details"]["technical"] = {
+                                "rsi": float(stock_details[symbol]["technical"]["rsi"]),
+                                "sma20_above_sma50": bool(stock_details[symbol]["technical"]["sma20_above_sma50"]),
+                                "price_above_sma20": bool(stock_details[symbol]["technical"]["price_above_sma20"]),
+                                "volatility": float(stock_details[symbol]["technical"]["volatility"])
+                            }
+                        
+                        # Generează teza de investiție
+                        try:
+                            recommendation["thesis"] = generate_investment_thesis(stock_details[symbol])
+                        except Exception as e:
+                            logger.error(f"Error generating thesis for {symbol}: {str(e)}")
+                            recommendation["thesis"] = f"Recomandare pentru {symbol}: Analizați fundamental această acțiune înainte de a investi."
+                        
+                        result["recommendations"].append(recommendation)
+                    except Exception as e:
+                        logger.error(f"Error processing details for {symbol}: {str(e)}")
+        else:
+            for symbol in final_recommendations:
+                try:
                     sources_list = list(recommendations[symbol])
                     max_sources = 7  # Număr maxim de surse posibile
                     confidence = min((len(sources_list) / max_sources) * 100.0, 100.0)
                     
-                    # Construim recomandarea
-                    recommendation = {
+                    result["recommendations"].append({
                         "symbol": str(symbol),
-                        "details": {
-                            "symbol": str(stock_details[symbol]["symbol"]),
-                            "name": str(stock_details[symbol]["name"]),
-                            "sector": str(stock_details[symbol]["sector"]),
-                            "last_price": float(stock_details[symbol]["last_price"]),
-                            "market_cap": float(stock_details[symbol]["market_cap"]),
-                            "market_cap_formatted": str(stock_details[symbol]["market_cap_formatted"]),
-                        },
                         "sources": sources_list,
                         "confidence": float(confidence)
-                    }
-                    
-                    # Adăugă performanță
-                    if "performance" in stock_details[symbol]:
-                        recommendation["details"]["performance"] = {
-                            "1_month": float(stock_details[symbol]["performance"]["1_month"]),
-                            "3_month": float(stock_details[symbol]["performance"]["3_month"])
-                        }
-                    
-                    # Adăugă indicatori tehnici
-                    if "technical" in stock_details[symbol]:
-                        recommendation["details"]["technical"] = {
-                            "rsi": float(stock_details[symbol]["technical"]["rsi"]),
-                            "sma20_above_sma50": bool(stock_details[symbol]["technical"]["sma20_above_sma50"]),
-                            "price_above_sma20": bool(stock_details[symbol]["technical"]["price_above_sma20"]),
-                            "volatility": float(stock_details[symbol]["technical"]["volatility"])
-                        }
-                    
-                    # Generează teza de investiție
-                    recommendation["thesis"] = generate_investment_thesis(stock_details[symbol])
-                    
-                    result["recommendations"].append(recommendation)
-        else:
-            for symbol in final_recommendations:
-                sources_list = list(recommendations[symbol])
-                max_sources = 7  # Număr maxim de surse posibile
-                confidence = min((len(sources_list) / max_sources) * 100.0, 100.0)
-                
-                result["recommendations"].append({
-                    "symbol": str(symbol),
-                    "sources": sources_list,
-                    "confidence": float(confidence)
-                })
+                    })
+                except Exception as e:
+                    logger.error(f"Error adding simplified recommendation for {symbol}: {str(e)}")
         
         # Adăugăm informații de piață
-        market_trend = await analyze_market_trend()
-        sector_performance = await get_sector_performance()
+        try:
+            market_trend = await analyze_market_trend()
+        except Exception as e:
+            logger.error(f"Error analyzing market trend: {str(e)}")
+            market_trend = {"trend": "unknown"}
+            
+        try:
+            sector_performance = await get_sector_performance()
+        except Exception as e:
+            logger.error(f"Error getting sector performance: {str(e)}")
+            sector_performance = {"top_sectors": []}
 
         # Procesăm corect sectoarele de top pentru afișare
         top_sectors = []
-        if sector_performance and "top_sectors" in sector_performance:
-            for sector_tuple in sector_performance["top_sectors"]:
-                if isinstance(sector_tuple, tuple) and len(sector_tuple) >= 2:
-                    sector_name = sector_tuple[0]
-                    sector_performance_value = sector_tuple[1].get("month_performance", 0) if isinstance(sector_tuple[1], dict) else 0
-                    top_sectors.append({
-                        "name": sector_name,
-                        "performance": round(sector_performance_value, 2)
-                    })
-                elif isinstance(sector_tuple, str):
-                    top_sectors.append({"name": sector_tuple, "performance": 0})
-
+        try:
+            if sector_performance and "top_sectors" in sector_performance:
+                for sector_tuple in sector_performance["top_sectors"]:
+                    if isinstance(sector_tuple, tuple) and len(sector_tuple) >= 2:
+                        sector_name = sector_tuple[0]
+                        sector_performance_value = 0
+                        
+                        if isinstance(sector_tuple[1], dict) and "month_performance" in sector_tuple[1]:
+                            sector_performance_value = sector_tuple[1]["month_performance"]
+                            
+                        top_sectors.append({
+                            "name": sector_name,
+                            "performance": round(float(sector_performance_value), 2)
+                        })
+                    elif isinstance(sector_tuple, str):
+                        top_sectors.append({"name": sector_tuple, "performance": 0})
+        except Exception as e:
+            logger.error(f"Error processing sector performance: {str(e)}")
+            
         result["market_overview"] = {
             "trend": str(market_trend.get("trend", "unknown")),
             "top_sectors": top_sectors
         }
         
+        # Adăugăm informații despre filtrarea aplicată
+        if filter_negative:
+            result["filter_info"] = {
+                "filtered_by_performance": True,
+                "min_performance": min_performance
+            }
+        
         return result
     except HTTPException as e:
         raise e
     except Exception as e:
-        logger.error(f"Error generating recommendations: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate recommendations: {str(e)}")
+        logger.error(f"Error generating recommendations: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to generate recommendations")
