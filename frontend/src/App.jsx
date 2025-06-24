@@ -6,6 +6,7 @@ import Profile from "./pages/Profile";
 import TradePage from "./pages/TradePage";
 import NewsPage from "./pages/NewsPage";
 import PrivateRoute from "./components/PrivateRoute";
+import RecommendationsPage from './pages/RecommendationsPage';
 import { isAuthenticated } from "./utils/auth";
 import Navbar from "./components/Navbar";
 
@@ -57,6 +58,7 @@ const AppWrapper = () => {
             </PrivateRoute>
           }
         />
+         <Route path="/recommendations" element={<RecommendationsPage />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </>
