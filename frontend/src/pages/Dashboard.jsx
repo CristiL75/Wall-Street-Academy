@@ -25,7 +25,6 @@ const Dashboard = () => {
   const [userId, setUserId] = useState(null);
   const [trades, setTrades] = useState([]);
   const [portfolio, setPortfolio] = useState(null);
-  const [nfts, setNfts] = useState([]);
   const [refreshCounter, setRefreshCounter] = useState(0);
 
     // State-uri pentru modalul de vânzare
@@ -99,7 +98,7 @@ const Dashboard = () => {
       const updateDashboard = () => {
         fetchTrades(payload.sub);
         fetchPortfolio(payload.sub);
-        fetchNFTs(payload.sub);
+
       };
       
       // Încărcarea inițială
@@ -168,40 +167,6 @@ const Dashboard = () => {
     }
   };
 
-  const fetchNFTs = async (uid) => {
-    try {
-      // URL complet pentru API nfts
-      const res = await axios.get(`http://127.0.0.1:8000/nfts/${uid}`);
-      const nftArray = Array.isArray(res.data) ? res.data : res.data.nfts || [];
-
-      const nftData = await Promise.all(
-        nftArray.map(async (nft) => {
-          const ipfsUrl = nft.token_uri.replace("ipfs://", "https://ipfs.io/ipfs/");
-          try {
-            const metaRes = await axios.get(ipfsUrl);
-            return {
-              ...nft,
-              name: metaRes.data.name,
-              image: metaRes.data.image.replace("ipfs://", "https://ipfs.io/ipfs/"),
-              description: metaRes.data.description,
-            };
-          } catch (metaErr) {
-            console.error("Error loading NFT metadata:", metaErr);
-            return {
-              ...nft,
-              name: "Unknown NFT",
-              image: "",
-              description: "Metadata unavailable"
-            };
-          }
-        })
-      );
-      setNfts(nftData);
-    } catch (err) {
-      console.error("Error loading NFTs:", err);
-      setNfts([]);
-    }
-  };
 
   // Funcții de calcul pentru valorile portofolliului
   const calculateTotalInvested = () => {
@@ -683,22 +648,7 @@ const renderPortfolioDistribution = () => {
       )}
     </section>
 
-    <section className="mb-6">
-      <h2 className="text-xl font-semibold">🏆 NFTs Earned</h2>
-      {nfts.length === 0 ? (
-        <p>No NFTs yet.</p>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {nfts.map((nft, i) => (
-            <div key={i} className="bg-white shadow p-4 rounded-lg">
-              <img src={nft.image} alt={nft.name} className="w-full h-48 object-contain mb-2" />
-              <h3 className="font-bold text-lg">{nft.name}</h3>
-              <p className="text-sm text-gray-600">{nft.description}</p>
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
+
 
     {/* Modalul de vânzare - aici este partea care lipsea */}
     {sellModalOpen && selectedHolding && (

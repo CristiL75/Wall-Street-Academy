@@ -625,7 +625,7 @@ async def build_user_trade_matrix():
 async def portfolio_based_recommendations(user_id: str, n_recommendations: int = 5):
     """Generează recomandări bazate direct pe portofoliul curent al utilizatorului."""
     try:
-        # Obține portofoliul utilizatorului
+        # Obține portofoliul utilizatorului - CORECTARE
         portfolio = await Portfolio.find_one({"user_id": PydanticObjectId(user_id)})
         if not portfolio or not portfolio.holdings:
             return []
@@ -649,10 +649,10 @@ async def portfolio_based_recommendations(user_id: str, n_recommendations: int =
         # Strategie 1: Acțiuni care completează portofoliul din sectoare performante
         for sector in top_performing_sectors:
             if sector not in primary_sectors:  # Preferăm sectoare care nu sunt deja bine reprezentate
-                sector_stocks = await Stock.find(
-                    (Stock.sector == sector) & 
-                    (Stock.symbol.not_in(portfolio_symbols))
-                ).to_list()
+                sector_stocks = await Stock.find({
+                    "sector": sector,
+                    "symbol": {"$nin": portfolio_symbols}
+                }).to_list()
                 
                 for stock in sector_stocks:
                     if not stock.symbol in stock_recommendations:
@@ -669,10 +669,10 @@ async def portfolio_based_recommendations(user_id: str, n_recommendations: int =
             
             if best_stock and hasattr(best_stock, "sector") and best_stock.sector:
                 # Găsește acțiuni similare din același sector
-                similar_stocks = await Stock.find(
-                    (Stock.sector == best_stock.sector) & 
-                    (Stock.symbol.not_in(portfolio_symbols))
-                ).to_list()
+                similar_stocks = await Stock.find({
+                    "sector": best_stock.sector,
+                    "symbol": {"$nin": portfolio_symbols}
+                }).to_list()
                 
                 for stock in similar_stocks:
                     if not stock.symbol in stock_recommendations:
@@ -707,10 +707,10 @@ async def portfolio_based_recommendations(user_id: str, n_recommendations: int =
         # Oferă recomandări pentru "core holdings" dacă portofoliul este mic
         if portfolio_stats["num_holdings"] < 5:
             # Adăugăm acțiuni blue-chip stabile pentru un portofoliu nou
-            blue_chips = await Stock.find(
-                (Stock.market_cap > 200e9) &  # Market cap de peste 200 miliarde
-                (Stock.symbol.not_in(portfolio_symbols))
-            ).limit(10).to_list()
+            blue_chips = await Stock.find({
+                "market_cap": {"$gt": 200e9},
+                "symbol": {"$nin": portfolio_symbols}
+            }).limit(10).to_list()
             
             for stock in blue_chips:
                 if not stock.symbol in stock_recommendations:
@@ -772,7 +772,7 @@ async def investment_goal_recommendations(user_id: str, n_recommendations: int =
                 "value": 0.3,
             }
         
-        # Ajustează și în funcție de apetitul pentru risc
+       
         if trading_style["risk_appetite"] == "conservative":
             investment_goals["growth"] -= 0.1
             investment_goals["income"] += 0.1
@@ -780,15 +780,17 @@ async def investment_goal_recommendations(user_id: str, n_recommendations: int =
             investment_goals["growth"] += 0.1
             investment_goals["income"] -= 0.1
         
-        # Obține portofoliul pentru a exclude acțiunile deja deținute
-        portfolio = await Portfolio.find_one(Portfolio.user_id == PydanticObjectId(user_id))
+        
+        portfolio = await Portfolio.find_one({"user_id": PydanticObjectId(user_id)})
         owned_symbols = []
         if portfolio and portfolio.holdings:
             owned_symbols = [holding.symbol for holding in portfolio.holdings]
         
-        # Filtrează acțiuni bazate pe obiectivele de investiții
-        all_stocks = await Stock.find(Stock.symbol.not_in(owned_symbols)).to_list()
         
+        all_stocks = await Stock.find({
+            "symbol": {"$nin": owned_symbols}
+        }).to_list()
+                
         stock_scores = {}
         
         for stock in all_stocks:
@@ -797,7 +799,7 @@ async def investment_goal_recommendations(user_id: str, n_recommendations: int =
             
             score = 0
             
-            # Obține datele istorice pentru analiză
+            
             hist_data = await get_stock_historical_data(stock.symbol)
             if hist_data is None or hist_data.empty:
                 continue
@@ -884,10 +886,11 @@ async def collaborative_filtering(user_id: str, matrix: Dict, symbols: List[str]
         similar_users.sort(key=lambda x: x[1], reverse=True)
         
         # Obține portofoliul utilizatorului pentru a exclude acțiuni deja deținute
-        portfolio = await Portfolio.find_one(Portfolio.user_id == PydanticObjectId(user_id))
+        portfolio = await Portfolio.find_one({"user_id": PydanticObjectId(user_id)})
         owned_symbols = []
         if portfolio and portfolio.holdings:
             owned_symbols = [h.symbol for h in portfolio.holdings]
+    
         
         # Generează recomandările
         recommendations = {}
@@ -1022,9 +1025,9 @@ async def content_based_filtering(user_id: str, n_recommendations: int = 5):
         favorite_sectors = sorted(sector_counts.items(), key=lambda x: x[1], reverse=True)
         
         # Obține acțiuni similare bazate pe sectoare
-        all_stocks = await Stock.find(
-            Stock.symbol.not_in(user_symbols)
-        ).to_list()
+        all_stocks = await Stock.find({
+            "symbol": {"$nin": user_symbols}
+        }).to_list()
         
         # Calculăm scoruri pentru acțiuni bazate pe cât de bine se potrivesc cu preferințele utilizatorului
         stock_scores = {}
@@ -1142,7 +1145,7 @@ async def technical_analysis(symbols: List[str], n_recommendations: int = 5):
 async def risk_based_recommendations(user_id: str, n_recommendations: int = 3):
     """Recomandă acțiuni în funcție de profilul de risc al utilizatorului."""
     try:
-        # Obține datele utilizatorului
+        # Obținem user data din funcția corectată
         user_data = await get_user_data(user_id)
         if not user_data["portfolio"] or not user_data["portfolio"].holdings:
             return []
@@ -1215,8 +1218,8 @@ async def risk_based_recommendations(user_id: str, n_recommendations: int = 3):
 async def diversification_recommendations(user_id: str, n_recommendations: int = 3):
     """Recomandă acțiuni pentru a diversifica portofoliul."""
     try:
-        # Obține portofoliul utilizatorului
-        portfolio = await Portfolio.find_one(Portfolio.user_id == PydanticObjectId(user_id))
+        # Obține portofoliul utilizatorului - CORECTARE
+        portfolio = await Portfolio.find_one({"user_id": PydanticObjectId(user_id)})
         if not portfolio or not portfolio.holdings:
             return []
         
@@ -1238,9 +1241,9 @@ async def diversification_recommendations(user_id: str, n_recommendations: int =
             portfolio_sectors[sector] = portfolio_sectors[sector] / total_value if total_value > 0 else 0
         
         # Identifică sectoare subreprezentate sau absente
-        all_stocks = await Stock.find(
-            Stock.symbol.not_in(list(portfolio_symbols))
-        ).to_list()
+        all_stocks = await Stock.find({
+            "symbol": {"$nin": list(portfolio_symbols)}
+        }).to_list()
         
         # Grupează acțiunile pe sectoare
         sector_stocks = {}

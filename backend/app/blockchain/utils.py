@@ -130,3 +130,15 @@ def mint_nft_to_user(user_wallet: str, token_uri: str) -> str:
 def reward_active_user(wallet_address: str, metadata_uri: str) -> str:
     print(f"🎁 Mint NFT to {wallet_address}")
     return mint_nft_to_user(wallet_address, metadata_uri)
+def get_user_nfts(wallet_address: str):
+    """
+    Returnează lista de tokenURI-uri pentru NFT-urile deținute de un wallet.
+    """
+    wallet_address = Web3.to_checksum_address(wallet_address)
+    balance = nft_contract.functions.balanceOf(wallet_address).call()
+    uris = []
+    for i in range(balance):
+        token_id = nft_contract.functions.tokenOfOwnerByIndex(wallet_address, i).call()
+        uri = nft_contract.functions.tokenURI(token_id).call()
+        uris.append(uri)
+    return uris

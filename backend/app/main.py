@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 
 
-from routers import users, trades, portfolios, leaderboard, auth, recommendations, stocks, chart, news  
+from routers import users, trades, portfolios, leaderboard, auth, recommendations, stocks, chart, news
+from routers import chatbot
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -40,7 +41,8 @@ app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(recommendations.router, prefix="/recommendations", tags=["AI"])  
 app.include_router(stocks.router, prefix="/stocks", tags=["Stocks"])
 app.include_router(news.router, prefix="/news", tags=["News"])
-app.include_router(chart.router) 
+app.include_router(chatbot.router, prefix="/api/chatbot", tags=["chatbot"])
+app.include_router(chart.router)
 
 
 

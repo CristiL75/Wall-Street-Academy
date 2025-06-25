@@ -9,6 +9,8 @@ import PrivateRoute from "./components/PrivateRoute";
 import RecommendationsPage from './pages/RecommendationsPage';
 import { isAuthenticated } from "./utils/auth";
 import Navbar from "./components/Navbar";
+// Adaugă importul pentru ChatbotPopup
+import ChatbotPopup from "./components/ChatbotPopup";
 
 const AppWrapper = () => {
   const location = useLocation();
@@ -50,7 +52,7 @@ const AppWrapper = () => {
             </PrivateRoute>
           }
         />
-               <Route
+        <Route
           path="/news"
           element={
             <PrivateRoute>
@@ -58,9 +60,12 @@ const AppWrapper = () => {
             </PrivateRoute>
           }
         />
-         <Route path="/recommendations" element={<RecommendationsPage />} />
+        <Route path="/recommendations" element={<RecommendationsPage />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
+      
+      {/* Adaugă ChatbotPopup aici - va fi afișat pe toate paginile */}
+      {isAuthenticated() && <ChatbotPopup />}
     </>
   );
 };

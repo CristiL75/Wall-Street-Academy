@@ -8,7 +8,7 @@ class User(Document):
     password_hash: str
     wallet_address: str = Field(default="")
     wallet_private_key: str = Field(default="")
-    created_at: datetime = Field(default_factory=datetime.utcnow)  # ✅ adăugat
+    created_at: datetime = Field(default_factory=datetime.utcnow)  
 
     class Settings:
         name = "users"
