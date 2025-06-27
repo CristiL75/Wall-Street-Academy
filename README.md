@@ -7,28 +7,54 @@ Wall Street Academy is an interactive platform for learning and practicing stock
 
 🚀 Features
 
-- 🔐 User Authentication – Secure login and registration system
-- 📊 Portfolio Dashboard – Real-time tracking of simulated investments
-- 💹 Trading Platform – Buy and sell stocks using virtual currency
-- 🏅 Achievement NFTs – Earn blockchain-based NFTs for reaching milestones
-- 🤖 AI-Powered Assistant – Get trading tips and portfolio analysis powered by AI
+- 🔐 User Authentication – Secure login and registration system  
+- 📊 Portfolio Dashboard – Real-time tracking of simulated investments  
+- 💹 Trading Platform – Buy and sell stocks using virtual currency  
+- 🏅 Achievement NFTs – Earn blockchain-based NFTs for reaching milestones  
+- 🤖 AI-Powered Assistant – Get trading tips and portfolio analysis powered by AI  
+- 📊 Smart Stock Recommendations – Personalized AI-based stock suggestions using technical and behavioral data
+
+---
+
+🧠 AI Recommendations Engine
+
+The recommendations system in Wall Street Academy provides personalized stock suggestions based on multiple advanced algorithms:
+
+**How It Works**  
+The system combines several techniques to tailor recommendations for each user:
+
+- **Technical Analysis** – Evaluates indicators like RSI, MACD, and SMA  
+- **Portfolio-Based Analysis** – Recommends stocks to balance existing holdings  
+- **Risk Profiling** – Aligns suggestions to the user’s volatility and behavior patterns  
+- **Diversification Engine** – Detects underrepresented sectors in the portfolio  
+- **Collaborative Filtering** – Learns from the investment behavior of similar users  
+- **Investment Goal Tracking** – Supports day traders, swing traders, and long-term investors
+
+**Key Features**  
+- Multi-factor scoring system  
+- Confidence ratings for each suggestion  
+- Automatic filtering of underperforming stocks  
+- Contextual investment thesis with market and sector data  
+- Technical indicators embedded in each recommendation
 
 ---
 
 🛠️ Technology Stack
 
-Backend
-- FastAPI – High-performance web framework
-- MongoDB + Beanie – Non-relational database with async ORM
-- Web3.py – Ethereum blockchain integration
-- Hardhat – Local blockchain development environment
-- JWT – Authentication and authorization
+**Backend**
+- FastAPI – High-performance web framework  
+- MongoDB + Beanie – Non-relational database with async ORM  
+- Web3.py – Ethereum blockchain integration  
+- Hardhat – Local blockchain development environment  
+- Mistral LLM – AI model for chatbot and recommendation engine  
+- Ollama – Local model deployment for AI features  
+- JWT – Authentication and authorization  
 
-Frontend
-- React – Component-based UI library
-- TailwindCSS – Utility-first styling framework
-- Chart.js – Beautiful and responsive charts
-- Axios – HTTP client for API communication
+**Frontend**
+- React – Component-based UI library  
+- TailwindCSS – Utility-first styling framework  
+- Chart.js – Beautiful and responsive charts  
+- Axios – HTTP client for API communication  
 
 ---
 
@@ -37,16 +63,18 @@ Frontend
 🔑 Prerequisites
 
 Make sure you have the following installed:
-- Python 3.8+
-- Node.js 14+
-- MongoDB
+- Python 3.8+  
+- Node.js 14+  
+- MongoDB  
 - Hardhat (for blockchain features)
 
 🧰 Installation
 
-1. Clone the repository
+1. Clone the repository:
+   ```bash
    git clone https://github.com/your-username/wall-street-academy.git
    cd wall-street-academy
+
 
 2. Install backend dependencies
    cd backend
@@ -96,6 +124,7 @@ wall-street-academy/
     │   ├── services/      # API integration
     │   └── utils/         # Helper functions
     └── package.json       # Node.js dependencies
+
 
 ---
 

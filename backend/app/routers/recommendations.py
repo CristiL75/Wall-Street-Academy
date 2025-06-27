@@ -1400,27 +1400,27 @@ def format_market_cap(market_cap):
         return f"${market_cap:.2f}"
 
 def generate_investment_thesis(stock_details):
-    """Generează o teză de investiție pentru o acțiune recomandată."""
-    thesis = f"Recomandare pentru {stock_details['symbol']} ({stock_details['name']}): "
+    """Generates an investment thesis for a recommended stock."""
+    thesis = f"Recommendation for {stock_details['symbol']} ({stock_details['name']}): "
     
-    # Analiză sectorială
-    thesis += f"{stock_details['name']} operează în sectorul {stock_details['sector']}. "
+    # Sector analysis
+    thesis += f"{stock_details['name']} operates in the {stock_details['sector']} sector. "
     
-    # Analiza performanței
+    # Performance analysis
     if "performance" in stock_details:
         perf_1m = stock_details["performance"]["1_month"]
         perf_3m = stock_details["performance"]["3_month"]
         
         if perf_1m > 0 and perf_3m > 0:
-            thesis += f"Acțiunea a avut o performanță pozitivă în ultimele 3 luni (+{perf_3m:.1f}%) și continuă trendul pozitiv în ultima lună (+{perf_1m:.1f}%). "
+            thesis += f"The stock has shown positive performance over the last 3 months (+{perf_3m:.1f}%) and continues its positive trend in the last month (+{perf_1m:.1f}%). "
         elif perf_1m > 0 and perf_3m < 0:
-            thesis += f"Deși acțiunea a scăzut în ultimele 3 luni ({perf_3m:.1f}%), în ultima lună a arătat semne de revenire (+{perf_1m:.1f}%). "
+            thesis += f"Although the stock has declined over the last 3 months ({perf_3m:.1f}%), it has shown signs of recovery in the past month (+{perf_1m:.1f}%). "
         elif perf_1m < 0 and perf_3m > 0:
-            thesis += f"Acțiunea a avut o performanță bună în ultimele 3 luni (+{perf_3m:.1f}%), dar a întâmpinat o corecție recentă ({perf_1m:.1f}%). "
+            thesis += f"The stock has performed well over the last 3 months (+{perf_3m:.1f}%), but has experienced a recent correction ({perf_1m:.1f}%). "
         else:
-            thesis += f"Acțiunea a avut dificultăți în ultimele 3 luni ({perf_3m:.1f}%) și în ultima lună ({perf_1m:.1f}%), ceea ce ar putea reprezenta o oportunitate de intrare la un preț redus. "
+            thesis += f"The stock has struggled in the last 3 months ({perf_3m:.1f}%) and in the last month ({perf_1m:.1f}%), which might present an entry opportunity at a reduced price. "
     
-    # Analiză tehnică
+    # Technical analysis
     if "technical" in stock_details:
         rsi = stock_details["technical"]["rsi"]
         sma_crossover = stock_details["technical"]["sma20_above_sma50"]
@@ -1428,39 +1428,39 @@ def generate_investment_thesis(stock_details):
         volatility = stock_details["technical"]["volatility"]
         
         if 30 <= rsi <= 70:
-            thesis += f"RSI de {rsi:.1f} indică o piață echilibrată. "
+            thesis += f"RSI of {rsi:.1f} indicates a balanced market. "
         elif rsi < 30:
-            thesis += f"RSI de {rsi:.1f} sugerează că acțiunea este supravândută și ar putea reveni. "
+            thesis += f"RSI of {rsi:.1f} suggests the stock is oversold and may be due for a rebound. "
         else:
-            thesis += f"RSI de {rsi:.1f} indică o poziție supraachiziționată, sugerând posibile corecții. "
+            thesis += f"RSI of {rsi:.1f} indicates an overbought position, suggesting possible corrections. "
         
         if sma_crossover and price_above_sma20:
-            thesis += "Analizele tehnice sunt pozitive, cu mediile mobile indicând un trend ascendent. "
+            thesis += "Technical analyses are positive, with moving averages indicating an upward trend. "
         elif price_above_sma20:
-            thesis += "Prețul este peste media mobilă de 20 de zile, un semn tehnic pozitiv. "
+            thesis += "Price is above the 20-day moving average, a positive technical sign. "
         
         if volatility < 20:
-            thesis += f"Cu o volatilitate de {volatility:.1f}%, acțiunea prezintă un nivel de risc relativ scăzut. "
+            thesis += f"With a volatility of {volatility:.1f}%, the stock presents a relatively low risk level. "
         elif volatility < 35:
-            thesis += f"Volatilitatea de {volatility:.1f}% este moderată. "
+            thesis += f"The volatility of {volatility:.1f}% is moderate. "
         else:
-            thesis += f"Volatilitatea ridicată de {volatility:.1f}% poate prezenta oportunități pentru investitori mai activi. "
+            thesis += f"The high volatility of {volatility:.1f}% may present opportunities for more active investors. "
     
-    # Concluzie
-    thesis += f"La prețul actual de ${stock_details['last_price']}, cu o capitalizare de piață de {stock_details['market_cap_formatted']}, "
+    # Conclusion
+    thesis += f"At the current price of ${stock_details['last_price']}, with a market cap of {stock_details['market_cap_formatted']}, "
     
     if "performance" in stock_details and "technical" in stock_details:
         perf_1m = stock_details["performance"]["1_month"]
         rsi = stock_details["technical"]["rsi"]
         
         if (perf_1m > 0 and 30 <= rsi <= 60) or (perf_1m < 0 and rsi < 40):
-            thesis += "considerăm că acțiunea oferă un raport risc-recompensă favorabil pentru investitorii interesați de acest sector."
+            thesis += "we believe the stock offers a favorable risk-reward ratio for investors interested in this sector."
         elif rsi > 70:
-            thesis += "recomandăm prudenţă și poate așteptarea unei corecții de preț înainte de a deschide o poziție."
+            thesis += "we recommend caution and perhaps waiting for a price correction before opening a position."
         else:
-            thesis += "aceasta poate fi o adăugare interesantă la un portofoliu diversificat."
+            thesis += "this could be an interesting addition to a diversified portfolio."
     else:
-        thesis += "aceasta poate merita o analiză mai detaliată pentru a determina potrivirea cu strategia dvs. de investiții."
+        thesis += "it may warrant further analysis to determine its fit with your investment strategy."
     
     return thesis
 
@@ -1812,3 +1812,254 @@ async def get_recommendations(
     except Exception as e:
         logger.error(f"Error generating recommendations: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to generate recommendations")
+    
+@router.get("/{user_id}/detail/{symbol}", response_model=Dict[str, Any])
+async def get_recommendation_detail(user_id: str, symbol: str):
+    """
+    Returns complete details for a specific stock recommendation.
+    """
+    try:
+        # Check if the user exists
+        user = await User.get(PydanticObjectId(user_id))
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Get stock details
+        stock = await Stock.find_one(Stock.symbol == symbol)
+        if not stock:
+            raise HTTPException(status_code=404, detail=f"Stock {symbol} not found")
+        
+        # Get historical data for technical analysis
+        hist_data = await get_stock_historical_data(symbol, period="3mo")
+        if hist_data is None:
+            raise HTTPException(status_code=500, detail="Failed to get historical data")
+        
+        # Get user portfolio to check if the stock is already owned
+        portfolio = await Portfolio.find_one({"user_id": PydanticObjectId(user_id)})
+        holding = None
+        currently_owned = False
+        
+        if portfolio and portfolio.holdings:
+            for h in portfolio.holdings:
+                if h.symbol == symbol:
+                    currently_owned = True
+                    holding = h
+                    break
+        
+        # Calculate performance across different timeframes
+        last_price = hist_data['Close'].iloc[-1]
+        
+        performance = {}
+        try:
+            if len(hist_data) >= 5:  # 1 week
+                performance["1_week"] = ((last_price / hist_data['Close'].iloc[-5]) - 1.0) * 100
+            else:
+                performance["1_week"] = 0
+                
+            if len(hist_data) >= 22:  # 1 month
+                performance["1_month"] = ((last_price / hist_data['Close'].iloc[-22]) - 1.0) * 100
+            else:
+                performance["1_month"] = 0
+                
+            if len(hist_data) >= 66:  # 3 months
+                performance["3_month"] = ((last_price / hist_data['Close'].iloc[-66]) - 1.0) * 100
+            else:
+                performance["3_month"] = ((last_price / hist_data['Close'].iloc[0]) - 1.0) * 100
+                
+            if len(hist_data) >= 126:  # ~6 months
+                performance["6_month"] = ((last_price / hist_data['Close'].iloc[-126]) - 1.0) * 100
+            else:
+                performance["6_month"] = ((last_price / hist_data['Close'].iloc[0]) - 1.0) * 100
+        except Exception as e:
+            logger.error(f"Error calculating performance: {str(e)}")
+            # Default values
+            performance = {
+                "1_week": 0,
+                "1_month": 0,
+                "3_month": 0,
+                "6_month": 0
+            }
+        
+        # Calculate technical indicators
+        rsi = hist_data['RSI'].iloc[-1] if 'RSI' in hist_data.columns else 50
+        sma20 = hist_data['SMA_20'].iloc[-1] if 'SMA_20' in hist_data.columns else last_price
+        sma50 = hist_data['SMA_50'].iloc[-1] if 'SMA_50' in hist_data.columns else last_price
+        
+        # Calculate MACD
+        macd_line = hist_data['MACD'].iloc[-1] if 'MACD' in hist_data.columns else 0
+        macd_signal = hist_data['MACD_Signal'].iloc[-1] if 'MACD_Signal' in hist_data.columns else 0
+        macd_hist = hist_data['MACD_Hist'].iloc[-1] if 'MACD_Hist' in hist_data.columns else 0
+        
+        # Calculate volatility
+        volatility = hist_data['Volatility'].iloc[-1] * 100 if 'Volatility' in hist_data.columns else 20
+        
+        # Generate technical signals
+        signals = []
+        
+        # RSI signal
+        if rsi < 30:
+            signals.append({
+                "type": "bullish", 
+                "message": f"RSI of {rsi:.1f} indicates oversold conditions, potential entry point",
+                "strength": 4
+            })
+        elif rsi > 70:
+            signals.append({
+                "type": "bearish", 
+                "message": f"RSI of {rsi:.1f} indicates overbought conditions, caution advised",
+                "strength": 4
+            })
+        
+        # SMA signal
+        if sma20 > sma50:
+            signals.append({
+                "type": "bullish", 
+                "message": "SMA20 above SMA50 indicates upward trend",
+                "strength": 3
+            })
+        else:
+            signals.append({
+                "type": "bearish", 
+                "message": "SMA20 below SMA50 indicates downward trend",
+                "strength": 3
+            })
+        
+        # MACD signal
+        if macd_line > macd_signal:
+            signals.append({
+                "type": "bullish", 
+                "message": "MACD above signal line indicates positive momentum",
+                "strength": 3
+            })
+        else:
+            signals.append({
+                "type": "bearish", 
+                "message": "MACD below signal line indicates negative momentum",
+                "strength": 3
+            })
+        
+        # Price signal
+        if last_price > sma20:
+            signals.append({
+                "type": "bullish", 
+                "message": "Price above SMA20 confirms short-term uptrend",
+                "strength": 2
+            })
+        else:
+            signals.append({
+                "type": "bearish", 
+                "message": "Price below SMA20 confirms short-term downtrend",
+                "strength": 2
+            })
+        
+        # Volatility signal
+        if volatility < 15:
+            signals.append({
+                "type": "neutral", 
+                "message": f"Low volatility ({volatility:.1f}%), possible accumulation before movement",
+                "strength": 2
+            })
+        elif volatility > 40:
+            signals.append({
+                "type": "neutral", 
+                "message": f"High volatility ({volatility:.1f}%), caution advised",
+                "strength": 3
+            })
+        
+        # Calculate support/resistance levels and risk/reward ratio
+        support = round(min(last_price * 0.95, last_price - last_price * volatility / 200), 2)
+        resistance = round(max(last_price * 1.05, last_price + last_price * volatility / 100), 2)
+        
+        stop_loss = round(support * 0.97, 2)  # Just below support
+        target_price = round(resistance * 1.03, 2)  # Just above resistance
+        
+        risk_percent = round((stop_loss / last_price - 1) * 100, 2)  # Potential loss
+        reward_percent = round((target_price / last_price - 1) * 100, 2)  # Potential gain
+        
+        # Risk/reward ratio (positive means good potential)
+        ratio = round(abs(reward_percent / risk_percent) if risk_percent != 0 else 0, 2)
+        
+        # Determine general direction based on signals
+        bullish_signals = len([s for s in signals if s["type"] == "bullish"])
+        bearish_signals = len([s for s in signals if s["type"] == "bearish"])
+        
+        if bullish_signals > bearish_signals:
+            consensus = {"direction": "bullish", "strength": min(bullish_signals * 2, 10)}
+        elif bearish_signals > bullish_signals:
+            consensus = {"direction": "bearish", "strength": min(bearish_signals * 2, 10)}
+        else:
+            consensus = {"direction": "neutral", "strength": 5}
+        
+        # Current position data if stock is in portfolio
+        holding_details = None
+        if currently_owned and holding:
+            profit_loss = (last_price - holding.avg_buy_price) * holding.quantity
+            holding_details = {
+                "quantity": holding.quantity,
+                "avg_buy_price": holding.avg_buy_price,
+                "market_value": last_price * holding.quantity,
+                "profit_loss": profit_loss,
+                "profit_loss_pct": (profit_loss / (holding.avg_buy_price * holding.quantity)) * 100 if holding.avg_buy_price > 0 else 0
+            }
+        
+        # Generate investment thesis
+        thesis = generate_investment_thesis({
+            "symbol": symbol,
+            "name": stock.name if hasattr(stock, 'name') else symbol,
+            "sector": stock.sector if hasattr(stock, 'sector') else "Unknown",
+            "last_price": last_price,
+            "market_cap": stock.market_cap if hasattr(stock, 'market_cap') else 0,
+            "market_cap_formatted": format_market_cap(stock.market_cap if hasattr(stock, 'market_cap') else 0),
+            "performance": performance,
+            "technical": {
+                "rsi": rsi,
+                "sma20_above_sma50": sma20 > sma50,
+                "price_above_sma20": last_price > sma20,
+                "volatility": volatility,
+                "sma20": sma20,
+                "sma50": sma50,
+                "macd": macd_line,
+                "macd_signal": macd_signal
+            }
+        })
+        
+        # Build final response
+        result = {
+            "symbol": symbol,
+            "name": stock.name if hasattr(stock, 'name') else symbol,
+            "sector": stock.sector if hasattr(stock, 'sector') else "Unknown",
+            "current_price": last_price,
+            "market_cap": stock.market_cap if hasattr(stock, 'market_cap') else 0,
+            "market_cap_formatted": format_market_cap(stock.market_cap if hasattr(stock, 'market_cap') else 0),
+            "performance": performance,
+            "technical": {
+                "rsi": rsi,
+                "sma20": sma20,
+                "sma50": sma50,
+                "macd": macd_line,
+                "macd_signal": macd_signal,
+                "macd_hist": macd_hist,
+                "volatility": volatility
+            },
+            "signals": signals,
+            "consensus": consensus,
+            "risk_reward": {
+                "support": support,
+                "resistance": resistance,
+                "stop_loss": stop_loss,
+                "target": target_price,
+                "risk_percent": risk_percent,
+                "reward_percent": reward_percent,
+                "ratio": ratio
+            },
+            "thesis": thesis,
+            "currently_owned": currently_owned,
+            "holding_details": holding_details
+        }
+        
+        return result
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Error getting recommendation detail: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get recommendation details")

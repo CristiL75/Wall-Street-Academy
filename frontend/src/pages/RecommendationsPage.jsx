@@ -65,6 +65,7 @@ const fetchRecommendations = async () => {
       setSelectedRecommendation(symbol);
       
       const response = await axios.get(`${API_URL}/recommendations/${userId}/detail/${symbol}`);
+      console.log('API response details:', response.data);
       setRecommendationDetails(response.data);
       
     } catch (err) {
@@ -486,16 +487,46 @@ const fetchRecommendations = async () => {
           </div>
         </div>
         
-        <div className="mb-6">
-          <h3 className="text-lg font-medium mb-2">Investment Thesis</h3>
-          <div className="bg-white border border-gray-200 rounded-lg p-4 whitespace-pre-line text-sm text-gray-800">
-            {details.thesis.split('\n').map((paragraph, idx) => (
-              <p key={idx} className={`mb-2 ${paragraph.startsWith('**') ? 'font-bold' : ''}`}>
-                {paragraph.replace(/\*\*/g, '')}
-              </p>
-            ))}
-          </div>
-        </div>
+      <div className="mb-6">
+  <h3 className="text-lg font-medium mb-2">Investment Thesis</h3>
+  <div className="bg-white border border-gray-200 rounded-lg p-4 whitespace-pre-line text-sm text-gray-800">
+    {details.thesis ? (
+      details.thesis.split('\n').map((paragraph, idx) => (
+        <p key={idx} className={`mb-2 ${paragraph.startsWith('**') ? 'font-bold' : ''}`}>
+          {paragraph.replace(/\*\*/g, '')}
+        </p>
+      ))
+    ) : (
+      <div>
+        <p className="mb-2">
+          Based on our analysis of {details.symbol} ({details.name}), this stock appears to be a 
+          {details.consensus.direction === 'bullish' 
+            ? ' promising investment opportunity.' 
+            : details.consensus.direction === 'bearish' 
+              ? ' potentially risky investment at current levels.' 
+              : ' neutral investment opportunity.'}
+        </p>
+        
+        <p className="mb-2">
+          Technical indicators show {details.technical.rsi < 30 ? 'oversold conditions with an RSI of ' + details.technical.rsi.toFixed(2) : 
+                                   details.technical.rsi > 70 ? 'overbought conditions with an RSI of ' + details.technical.rsi.toFixed(2) : 
+                                   'a neutral RSI reading of ' + details.technical.rsi.toFixed(2)}.
+        </p>
+        
+        <p className="mb-2">
+          Recent performance has been {details.performance["1_month"] > 0 ? 'positive' : 'negative'} with a {Math.abs(details.performance["1_month"]).toFixed(2)}% 
+          change over the past month.
+        </p>
+        
+        <p>
+          The risk/reward ratio is currently {details.risk_reward.ratio}:1, which indicates 
+          {details.risk_reward.ratio >= 2 ? ' a favorable' : details.risk_reward.ratio >= 1 ? ' an acceptable' : ' a poor'} 
+          risk-adjusted return potential.
+        </p>
+      </div>
+    )}
+  </div>
+</div>
         
         <div className="flex justify-end mt-6">
           <button
