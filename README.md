@@ -149,7 +149,15 @@ This project is licensed under the MIT License – see the LICENSE file for deta
 
 Latcu Cristian Simion
 
----
+---![image](https://github.com/user-attachments/assets/bbadda02-23b5-4d47-9c28-0f8a0c5745f5)![image](https://github.com/user-attachments/assets/75c79578-40b3-4e32-8656-ff417e167441)![image](https://github.com/user-attachments/assets/8adfcccb-8786-4f98-84fd-00390a56961c)![image](https://github.com/user-attachments/assets/0675c2b3-62cf-4a1b-a237-85e23b5edb8e)![image](https://github.com/user-attachments/assets/9546f4d5-b03b-4795-985b-1af0ae6f51b4)![image](https://github.com/user-attachments/assets/e42e09af-3f94-4658-bfe1-774de03d10c1)![image](https://github.com/user-attachments/assets/18a7b857-1af1-434e-8b24-55b0053047f9)![image](https://github.com/user-attachments/assets/3478e21e-5c7e-495c-a794-43b268ef6bfe)
+
+
+
+
+
+
+
+
 
 🙏 Acknowledgements
 
