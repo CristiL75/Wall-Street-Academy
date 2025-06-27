@@ -23,14 +23,14 @@ const handleLogout = () => {
         >
           News
         </Link>
-        {/* ✅ Adăugat link pentru recomandări */}
+
         <Link 
           to="/recommendations" 
           className="text-white hover:bg-blue-700 px-3 py-2 rounded"
         >
           AI Recommendations
         </Link>
-        <Link to="/profile" className="hover:underline">Profil</Link>
+        <Link to="/profile" className="hover:underline">Profile</Link>
         <button onClick={handleLogout} className="text-red-400 hover:underline">
           Logout
         </button>

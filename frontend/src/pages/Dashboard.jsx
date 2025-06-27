@@ -55,7 +55,7 @@ const Dashboard = () => {
   // Funcție pentru executarea vânzării
   const executeSell = async () => {
     if (!selectedHolding || sellQuantity <= 0 || sellQuantity > selectedHolding.quantity) {
-      setSellFeedback("❌ Cantitate invalidă");
+      setSellFeedback("❌ Invalid quantity");
       return;
     }
     
@@ -70,22 +70,22 @@ const Dashboard = () => {
         commission: 0,
       };
       
-      setSellFeedback("Procesare tranzacție...");
+      setSellFeedback("Processing transaction...");
       
       const response = await axios.post("http://127.0.0.1:8000/trades/", payload);
       console.log("Sell response:", response.data);
       
-      setSellFeedback("✅ Tranzacție de vânzare realizată cu succes!");
+     setSellFeedback("✅ Sale transaction completed successfully!");
       
-      // După 2 secunde, închide modalul și actualizează datele
+    
       setTimeout(() => {
         closeSellModal();
-        forceRefresh(); // Actualizează dashboardul pentru a reflecta schimbările
+        forceRefresh(); 
       }, 2000);
       
     } catch (err) {
       console.error("Sell failed:", err);
-      setSellFeedback(`❌ Eroare: ${err.response?.data?.detail || err.message}`);
+      setSellFeedback(`❌ Erorr: ${err.response?.data?.detail || err.message}`);
     }
   };
   
@@ -116,12 +116,12 @@ const Dashboard = () => {
       return () => clearInterval(refreshInterval);
     }
   }, [refreshCounter]);
-// ...restul codului...
+
 
 useEffect(() => {
   console.log("portfolio in useEffect:", portfolio);
   if (portfolio?.wallet_address && userId) {
-    // Încearcă să minezi NFT-uri pentru user dacă îndeplinește condițiile
+
     axios.post(`http://127.0.0.1:8000/check-10-days-nft/${userId}`)
       .then(res => console.log("Check 10 days NFT:", res.data))
       .catch(err => console.log("Check 10 days NFT error:", err.response?.data?.detail || err.message));
@@ -555,7 +555,12 @@ const renderPortfolioDistribution = () => {
 
  return (
   <div className="dashboard p-4">
-    <h1 className="text-2xl font-bold mb-4">Welcome to your Dashboard</h1>
+  <h1 className="text-3xl font-semibold mb-6 text-gray-800 flex items-center">
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mr-3 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+  </svg>
+  Portfolio Dashboard
+</h1>
     
     {/* Buton pentru reîmprospătare manuală */}
     <button 
@@ -566,7 +571,12 @@ const renderPortfolioDistribution = () => {
     </button>
 
    <section className="mb-6">
-  <h2 className="text-xl font-semibold mb-3">📈 Portfolio Overview</h2>
+ <h2 className="text-xl font-semibold mb-3 text-gray-700 flex items-center">
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+  </svg>
+  Portfolio Overview
+</h2>
   
   {portfolio && (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -616,7 +626,12 @@ const renderPortfolioDistribution = () => {
  
     {portfolio?.holdings?.length > 0 && (
       <section className="mb-6">
-        <h2 className="text-xl font-semibold">📊 Portfolio Holdings</h2>
+        <h2 className="text-xl font-semibold mb-3 text-gray-700 flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          Portfolio Holdings
+        </h2>
         <div className="mt-2 overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -663,7 +678,12 @@ const renderPortfolioDistribution = () => {
     )}
 
     <section className="mb-6">
-      <h2 className="text-xl font-semibold">📄 Recent Trades</h2>
+        <h2 className="text-xl font-semibold mb-3 text-gray-700 flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          Recent Trades
+        </h2>
       {trades.length === 0 ? (
         <p>No trades yet.</p>
       ) : (
@@ -706,36 +726,19 @@ const renderPortfolioDistribution = () => {
     </section>
 
 <section className="mb-6">
-  <h2 className="text-xl font-semibold">🎖️ NFT-urile tale</h2>
+ <h2 className="text-xl font-semibold mb-3 text-gray-700 flex items-center">
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+  </svg>
+  Achievement NFTs
+</h2>
 
 
   {userNFTs.length === 0 ? (
     <div>
-      <p className="mb-2">Nu ai NFT-uri.</p>
+      <p className="mb-2">You don't have any NFTs</p>
       <div className="text-xs text-gray-500">
-        {portfolio?.wallet_address ? (
-          <>
-            <div>
-              <strong>Adresa wallet:</strong> {portfolio.wallet_address}
-            </div>
-            <div>
-              <strong>Posibile motive:</strong>
-              <ul className="list-disc ml-5">
-                <li>Nu ai atins niciun achievement.</li>
-                <li>NFT-urile nu au fost minate pe blockchain.</li>
-                <li>Backend-ul nu returnează corect NFT-urile.</li>
-              </ul>
-            </div>
-            <div>
-              <strong>Debug:</strong>
-              <pre>
-                {JSON.stringify(userNFTs, null, 2)}
-              </pre>
-            </div>
-          </>
-        ) : (
-          <span>(Nu există wallet asociat contului tău.)</span>
-        )}
+  
       </div>
     </div>
   ) : (

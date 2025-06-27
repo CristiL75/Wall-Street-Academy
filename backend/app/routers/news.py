@@ -34,11 +34,11 @@ async def get_financial_news():
     """
     print("GET /news endpoint called")
 
-    # Folosim o listă mai lungă de tickeri pentru a mări șansele de a găsi știri
+
     tickers_to_try = [
         "AAPL", "MSFT", "GOOG", "AMZN", "SPY", "QQQ", "TSLA", "META", "NVDA", "JPM",
         "GE", "BAC", "F", "AMD", "INTC", "WFC", "PFE", "DIS", "XOM", "WMT",
-        "^GSPC", "^DJI", "^IXIC"  # Adăugăm și indici pentru știri generale de piață
+        "^GSPC", "^DJI", "^IXIC"  
     ]
 
     all_news = []

@@ -20,7 +20,7 @@ const Login = () => {
     setError("");
 
     if (!formData.email || !formData.password) {
-      setError("Completează toate câmpurile.");
+      setError("Please complete all fields");
       return;
     }
 

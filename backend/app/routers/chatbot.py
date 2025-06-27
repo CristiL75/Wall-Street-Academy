@@ -32,16 +32,19 @@ async def chat_with_mistral(
 ):
     """
     Chatbot endpoint using local Mistral (Ollama).
-    Always responds in English, but can understand the user's language.
+    Responds in the same language the user asked the question in.
     Uses user's portfolio as context if user is logged in.
     """
     try:
-        # 1. Adaugă context din portofoliu doar dacă utilizatorul nu este "guest"
+
         portfolio_context = await get_user_portfolio(user_id)
         
         system_prompt = (
             "You are a helpful assistant for the Wall Street Academy app. "
-            "You always answer in English, but you can understand the user's language. "
+            "IMPORTANT: Always respond in the same language the user asks their question in. "
+            "If they write in English, respond in English. "
+            "If they write in Romanian, respond in Romanian. "
+            "If they write in Spanish, respond in Spanish, etc. "
             "You have access to the user's portfolio information and can answer questions about it. "
             f"{portfolio_context}\n"
             "If the user asks about their stocks, use this information."

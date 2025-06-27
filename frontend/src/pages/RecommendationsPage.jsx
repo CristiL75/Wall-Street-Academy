@@ -32,13 +32,13 @@ const RecommendationsPage = () => {
   useEffect(() => {
     if (!userId) return;
     
-   // În funcția fetchRecommendations, după ce primești răspunsul:
+
 
 const fetchRecommendations = async () => {
   try {
     setLoading(true);
     
-    // Obține recomandările personalizate
+  
     const response = await axios.get(`${API_URL}/recommendations/${userId}`);
     
     console.log('Market overview data:', response.data.market_overview);

@@ -121,7 +121,7 @@ async def check_and_mint_profit_nft(user_id: str):
         return {"error": "Profit data not available for user"}
     if Decimal(profit) > 0:
         achievement = "profit_positive"
-        # Folosește direct linkul IPFS generat de Pinata pentru acest achievement
+       
         token_uri = "ipfs://QmP7vuFVH6jNfwU5sQP16AstYRUEvGwUjQu2wxwXz12E3Q"
         nonce = w3.eth.get_transaction_count(admin_address)
         wallet_address = w3.to_checksum_address(user.wallet_address)
@@ -169,35 +169,50 @@ async def get_user_nfts(wallet_address: str):
         wallet_checksum = Web3.to_checksum_address(wallet_address)
         print(f"Checksum address: {wallet_checksum}")
         
-        print("Calling balanceOf...")
-        balance = contract.functions.balanceOf(wallet_checksum).call()
-        print(f"NFT balance: {balance}")
+        # Verifică NFT-uri din baza de date ca fallback/backup
+        db_achievements = await UserAchievement.find(
+            {"wallet_address": wallet_address}
+        ).to_list()
         
-        if balance == 0:
-            return []
+        print(f"Found {len(db_achievements)} NFTs in database")
         
-        nfts = []
+        nfts_from_db = []
+        for ach in db_achievements:
+            nfts_from_db.append({
+                "token_id": ach.tx_hash[:10],  # Un identificator unic bazat pe tx_hash
+                "token_uri": ach.token_uri,
+                "metadata": {
+                    "name": f"Achievement: {ach.achievement_type}",
+                    "description": f"Wall Street Academy Achievement: {ach.achievement_type}",
+                    "image": ach.token_uri.replace("ipfs://", "https://ipfs.io/ipfs/")
+                }
+            })
         
-        # Folosim scanarea de token ID-uri, care funcționează cu toate versiunile de web3
-        print("Scanning for tokens...")
-        
-        # Presupunem că ID-urile sunt între 0 și 100 (sau alt număr rezonabil)
-        for potential_token_id in range(0, 100):
-            try:
-                # Verifică dacă acest token ID există și cine este proprietarul
-                owner = contract.functions.ownerOf(potential_token_id).call()
-                
-                # Dacă token-ul aparține wallet-ului nostru
-                if owner.lower() == wallet_checksum.lower():
-                    print(f"Found token {potential_token_id} owned by wallet")
+        try:
+            # Încearcă să obțină NFT-urile din blockchain
+            print("Calling balanceOf...")
+            balance = contract.functions.balanceOf(wallet_checksum).call()
+            print(f"NFT balance from blockchain: {balance}")
+            
+            if balance == 0:
+                print("No NFTs found in blockchain, returning database results")
+                return nfts_from_db if nfts_from_db else []
+            
+            nfts = []
+            
+            # Folosim tokenOfOwnerByIndex în loc de scanare - mai eficient
+            for i in range(balance):
+                try:
+                    token_id = contract.functions.tokenOfOwnerByIndex(wallet_checksum, i).call()
+                    print(f"Token ID from index {i}: {token_id}")
                     
                     # Obține URL-ul de metadata
-                    token_uri = contract.functions.tokenURI(potential_token_id).call()
+                    token_uri = contract.functions.tokenURI(token_id).call()
                     print(f"Token URI: {token_uri}")
                     
                     # Pregătește metadatele pentru frontend
                     nfts.append({
-                        "token_id": potential_token_id,
+                        "token_id": token_id,
                         "token_uri": token_uri,
                         "metadata": {
                             "name": "Achievement NFT",
@@ -205,16 +220,23 @@ async def get_user_nfts(wallet_address: str):
                             "image": token_uri.replace("ipfs://", "https://ipfs.io/ipfs/")
                         }
                     })
-                    
-                    # Dacă am găsit toate NFT-urile raportate de balanceOf, ne oprim
-                    if len(nfts) >= balance:
-                        break
-            except Exception as e:
-                # Token ID-ul probabil nu există, continuăm cu următorul
-                pass
-        
-        print(f"Returning {len(nfts)} NFTs")
-        return nfts
+                except Exception as e:
+                    print(f"Error getting token at index {i}: {e}")
+                    continue
+            
+            if len(nfts) > 0:
+                print(f"Returning {len(nfts)} NFTs from blockchain")
+                return nfts
+            else:
+                print("Falling back to database NFTs")
+                return nfts_from_db if nfts_from_db else []
+                
+        except Exception as e:
+            # În cazul în care blockchain-ul nu răspunde, folosește NFT-urile din baza de date
+            print(f"Error accessing blockchain: {e}")
+            print("Falling back to database results")
+            return nfts_from_db if nfts_from_db else []
+            
     except Exception as e:
         print(f"ERROR in get_user_nfts: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching NFTs: {str(e)}")

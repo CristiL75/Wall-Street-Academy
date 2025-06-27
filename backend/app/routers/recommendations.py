@@ -1218,7 +1218,7 @@ async def risk_based_recommendations(user_id: str, n_recommendations: int = 3):
 async def diversification_recommendations(user_id: str, n_recommendations: int = 3):
     """Recomandă acțiuni pentru a diversifica portofoliul."""
     try:
-        # Obține portofoliul utilizatorului - CORECTARE
+        # Obține portofoliul utilizatorului
         portfolio = await Portfolio.find_one({"user_id": PydanticObjectId(user_id)})
         if not portfolio or not portfolio.holdings:
             return []
@@ -1502,10 +1502,9 @@ async def get_recommendations(
         
         # Inițializăm rezultatele - utilizăm dicționar pentru a asigura unicitatea simbolurilor
         recommendations = {}
+   
         
-        # --- 1. Obține simboluri din toate sursele posibile pentru analiză tehnică ---
-        
-        # Simboluri din tranzacțiile utilizatorilor (colaborative)
+        # Simboluri din tranzacțiile utilizatorilor 
         try:
             matrix, collab_symbols = await build_user_trade_matrix()
             # Adaugă simboluri implicite dacă nu există
@@ -1536,7 +1535,7 @@ async def get_recommendations(
             logger.warning(f"No symbols available for recommendations for user {user_id}")
             all_analysis_symbols = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NFLX"]
         
-        # --- 2. Generează recomandări din fiecare sursă separat ---
+    
         
         # Analiză tehnică - va funcționa pentru toți utilizatorii
         try:
@@ -1611,7 +1610,7 @@ async def get_recommendations(
         except Exception as e:
             logger.error(f"Error in investment goal recommendations: {str(e)}")
         
-        # --- 3. Combină și prioritizează recomandările ---
+      
         
         # Verificăm dacă avem recomandări
         if not recommendations:
@@ -1636,7 +1635,7 @@ async def get_recommendations(
         except Exception as e:
             logger.error(f"Error getting stock details: {str(e)}")
         
-        # --- Filtrez recomandările în funcție de performanță și calitate ---
+  
         high_quality_recommendations = []
         medium_quality_recommendations = []
         
@@ -1685,7 +1684,7 @@ async def get_recommendations(
         # Limităm la numărul cerut
         final_recommendations = final_recommendations[:limit]
         
-        # --- 4. Generează rezultatul final ---
+       
         result = {"recommendations": []}
         
         if include_details:

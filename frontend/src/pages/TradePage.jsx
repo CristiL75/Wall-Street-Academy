@@ -166,8 +166,12 @@ const handleSubmit = async (e) => {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">📈 Tranzacționează acțiuni</h1>
-
+      <h1 className="text-3xl font-semibold mb-5 text-gray-800 flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 mr-2 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          Trade Stocks
+      </h1>
       <div className="overflow-x-auto whitespace-nowrap mb-4 py-2 flex space-x-2 border-b pb-2">
         {companies.map((comp) => (
           <button
@@ -225,9 +229,9 @@ const handleSubmit = async (e) => {
           className="w-full border px-3 py-2 rounded"
           required
         />
-        {price && <p className="text-gray-600">Preț curent: ${price}</p>}
+        {price && <p className="text-gray-600 font-medium tracking-tight">Current Price: <span className="text-blue-700">${price}</span></p>}
         <button className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-          Execută Tranzacția
+              Execute Trade
         </button>
         {feedback && <p className="text-sm mt-2">{feedback}</p>}
       </form>
