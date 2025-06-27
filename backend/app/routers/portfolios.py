@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from models.portfolio import Portfolio
+from models.user import User  # asigură-te că ai acest import!
 from bson import ObjectId
 import yfinance as yf
 from datetime import datetime
@@ -58,6 +59,11 @@ async def get_portfolio(user_id: str):
     if not portfolio:
         raise HTTPException(status_code=404, detail="Portfolio not found")
 
+    # Caută userul asociat portofoliului
+    user = await User.find_one(User.id == user_oid)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
     # Log pentru debugging
     print(f"Portfolio for {user_id}: {len(portfolio.holdings)} holdings")
 
@@ -65,6 +71,7 @@ async def get_portfolio(user_id: str):
         return {
             "cash": round(portfolio.cash, 2),
             "holdings": [],
+            "wallet_address": user.wallet_address,
             "total_invested": 0.0,
             "total_value": round(portfolio.cash, 2),
             "total_profit": 0.0,
@@ -133,6 +140,7 @@ async def get_portfolio(user_id: str):
             } 
             for h in portfolio.holdings
         ],
+        "wallet_address": user.wallet_address,
         "total_invested": round(sum(h.avg_buy_price * h.quantity for h in portfolio.holdings), 2),
         "total_value": round(portfolio.cash + sum(h.market_value for h in portfolio.holdings), 2),
         "total_profit": round(sum((h.current_price - h.avg_buy_price) * h.quantity for h in portfolio.holdings), 2),

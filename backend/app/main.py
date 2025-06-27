@@ -3,14 +3,20 @@ from fastapi import FastAPI
 
 from routers import users, trades, portfolios, leaderboard, auth, recommendations, stocks, chart, news
 from routers import chatbot
+from routers import nft
+# Importă tot modulul achievements, nu doar UserAchievement
+from routers import achievements  # Modificare aici
+from routers.achievements import UserAchievement
 
-from fastapi.middleware.cors import CORSMiddleware
 
+# Elimina a doua declarare a app - e definită de două ori!
 app = FastAPI(title="Wall Street Academy API")
 
 
-# Adaugă imediat după definirea app = FastAPI()
+from fastapi.middleware.cors import CORSMiddleware
 
+# Șterge această linie - este definită deja mai sus
+# app = FastAPI(title="Wall Street Academy API")
 
 
 app.add_middleware(
@@ -27,7 +33,8 @@ from db_stocks import init_stock_db
 
 @app.on_event("startup")
 async def app_startup():
-    await init_main_db()
+  
+    await init_main_db([UserAchievement])  # Treci UserAchievement ca parametru
     await init_stock_db()
 
 
@@ -42,8 +49,9 @@ app.include_router(recommendations.router, prefix="/recommendations", tags=["AI"
 app.include_router(stocks.router, prefix="/stocks", tags=["Stocks"])
 app.include_router(news.router, prefix="/news", tags=["News"])
 app.include_router(chatbot.router, prefix="/api/chatbot", tags=["chatbot"])
+app.include_router(achievements.router)
+app.include_router(nft.router)
 app.include_router(chart.router)
-
 
 
 @app.get("/")

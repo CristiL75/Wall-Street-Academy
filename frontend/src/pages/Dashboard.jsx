@@ -26,6 +26,7 @@ const Dashboard = () => {
   const [trades, setTrades] = useState([]);
   const [portfolio, setPortfolio] = useState(null);
   const [refreshCounter, setRefreshCounter] = useState(0);
+  const [userNFTs, setUserNFTs] = useState([]);
 
     // State-uri pentru modalul de vânzare
   const [sellModalOpen, setSellModalOpen] = useState(false);
@@ -98,6 +99,7 @@ const Dashboard = () => {
       const updateDashboard = () => {
         fetchTrades(payload.sub);
         fetchPortfolio(payload.sub);
+   
 
       };
       
@@ -114,7 +116,29 @@ const Dashboard = () => {
       return () => clearInterval(refreshInterval);
     }
   }, [refreshCounter]);
+// ...restul codului...
 
+useEffect(() => {
+  console.log("portfolio in useEffect:", portfolio);
+  if (portfolio?.wallet_address && userId) {
+    // Încearcă să minezi NFT-uri pentru user dacă îndeplinește condițiile
+    axios.post(`http://127.0.0.1:8000/check-10-days-nft/${userId}`)
+      .then(res => console.log("Check 10 days NFT:", res.data))
+      .catch(err => console.log("Check 10 days NFT error:", err.response?.data?.detail || err.message));
+
+    axios.post(`http://127.0.0.1:8000/check-profit-nft/${userId}`)
+      .then(res => {
+        console.log("Check profit NFT:", res.data);
+        // Adăugăm un delay pentru a da timp tranzacției să fie procesată
+        setTimeout(() => {
+          fetchNFTs(portfolio.wallet_address);
+        }, 3000); // 3 secunde delay
+      })
+      .catch(err => console.log("Check profit NFT error:", err.response?.data?.detail || err.message));
+  }
+}, [portfolio, userId]);
+
+// ...restul codului...
   // Funcție pentru a forța reîmprospătarea
   const forceRefresh = () => {
     setRefreshCounter(prev => prev + 1);
@@ -148,12 +172,45 @@ const Dashboard = () => {
     }
   };
 
+const fetchNFTs = async (walletAddress) => {
+  try {
+    const res = await axios.get(`http://127.0.0.1:8000/user-nfts/${walletAddress}`);
+    console.log("NFTs from backend:", res.data); // vezi dacă primești ceva aici
+    const nfts = res.data;
+
+    if (!Array.isArray(nfts) || nfts.length === 0) {
+      console.warn("Nu există NFT-uri pentru acest wallet:", walletAddress);
+    }
+
+    // Fetch metadata pentru fiecare NFT (token_uri)
+    const nftsWithMeta = await Promise.all(
+      nfts.map(async (nft) => {
+        try {
+          const metaRes = await axios.get(
+            nft.token_uri.startsWith("ipfs://")
+              ? nft.token_uri.replace("ipfs://", "https://ipfs.io/ipfs/")
+              : nft.token_uri
+          );
+          return { ...nft, metadata: metaRes.data };
+        } catch (err) {
+          console.error("Eroare la fetch metadata pentru NFT:", nft.token_uri, err);
+          return { ...nft, metadata: null };
+        }
+      })
+    );
+    setUserNFTs(nftsWithMeta);
+  } catch (err) {
+    console.error("Error fetching NFTs:", err);
+    setUserNFTs([]);
+  }
+};
+
   const fetchPortfolio = async (uid) => {
     try {
       // URL complet pentru API portfolios
       const res = await axios.get(`http://127.0.0.1:8000/portfolios/${uid}`);
       console.log("Loaded portfolio:", res.data);
-      
+      setPortfolio(res.data);
       // Verifică dacă holdings este un array, altfel inițializează ca array gol
       if (!res.data.holdings || !Array.isArray(res.data.holdings)) {
         res.data.holdings = [];
@@ -648,6 +705,79 @@ const renderPortfolioDistribution = () => {
       )}
     </section>
 
+<section className="mb-6">
+  <h2 className="text-xl font-semibold">🎖️ NFT-urile tale</h2>
+
+
+  {userNFTs.length === 0 ? (
+    <div>
+      <p className="mb-2">Nu ai NFT-uri.</p>
+      <div className="text-xs text-gray-500">
+        {portfolio?.wallet_address ? (
+          <>
+            <div>
+              <strong>Adresa wallet:</strong> {portfolio.wallet_address}
+            </div>
+            <div>
+              <strong>Posibile motive:</strong>
+              <ul className="list-disc ml-5">
+                <li>Nu ai atins niciun achievement.</li>
+                <li>NFT-urile nu au fost minate pe blockchain.</li>
+                <li>Backend-ul nu returnează corect NFT-urile.</li>
+              </ul>
+            </div>
+            <div>
+              <strong>Debug:</strong>
+              <pre>
+                {JSON.stringify(userNFTs, null, 2)}
+              </pre>
+            </div>
+          </>
+        ) : (
+          <span>(Nu există wallet asociat contului tău.)</span>
+        )}
+      </div>
+    </div>
+  ) : (
+    <ul className="mt-2 space-y-2">
+      {userNFTs.map((nft) => (
+        <li key={nft.token_id} className="bg-white p-3 rounded shadow flex items-center space-x-4">
+          {nft.metadata?.image && (
+            <img
+              src={
+                nft.metadata.image.startsWith("ipfs://")
+                  ? nft.metadata.image.replace("ipfs://", "https://ipfs.io/ipfs/")
+                  : nft.metadata.image
+              }
+              alt={nft.metadata?.name}
+              className="w-12 h-12 rounded"
+            />
+          )}
+          <div>
+            <div className="font-medium text-blue-700">
+              NFT #{nft.token_id} {nft.metadata?.name && `- ${nft.metadata.name}`}
+            </div>
+            {nft.metadata?.description && (
+              <div className="text-sm text-gray-600">{nft.metadata.description}</div>
+            )}
+            <a
+              href={
+                nft.token_uri.startsWith("ipfs://")
+                  ? nft.token_uri.replace("ipfs://", "https://ipfs.io/ipfs/")
+                  : nft.token_uri
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-blue-500 underline"
+            >
+              Vezi metadata
+            </a>
+          </div>
+        </li>
+      ))}
+    </ul>
+  )}
+</section>
 
 
     {/* Modalul de vânzare - aici este partea care lipsea */}

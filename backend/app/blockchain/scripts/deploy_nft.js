@@ -1,9 +1,12 @@
+const { ethers } = require("hardhat");
+
 async function main() {
   const [deployer] = await ethers.getSigners();
   console.log("Deploying NFT contract with account:", deployer.address);
 
   const NFT = await ethers.getContractFactory("UserAchievementNFT");
-  const nft = await NFT.deploy(); // fără argument
+  // Trimite adresa ownerului ca argument la deploy!
+  const nft = await NFT.deploy(deployer.address);
 
   await nft.waitForDeployment();
 
